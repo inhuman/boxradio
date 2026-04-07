@@ -2,30 +2,103 @@
 
 // ── stations ──────────────────────────────────────────────────────────────────
 const STATIONS = [
+  // ── SomaFM ──────────────────────────────────────────────────────────────
   {
-    name:   'Groove Salad',
-    genre:  'ambient · electronic',
-    url:    'https://ice6.somafm.com/groovesalad-128-mp3',
+    name:  'Groove Salad',
+    genre: 'ambient · electronic',
+    url:   'https://ice6.somafm.com/groovesalad-128-mp3',
   },
   {
-    name:   'Secret Agent',
-    genre:  'spy · lounge · jazz',
-    url:    'https://ice6.somafm.com/secretagent-128-mp3',
+    name:  'Lush',
+    genre: 'chillout · downbeat',
+    url:   'https://ice6.somafm.com/lush-128-mp3',
   },
   {
-    name:   'Lush',
-    genre:  'chillout · downbeat',
-    url:    'https://ice6.somafm.com/lush-128-mp3',
+    name:  'Deep Space One',
+    genre: 'deep space · ambient',
+    url:   'https://ice6.somafm.com/deepspaceone-128-mp3',
   },
   {
-    name:   'Deep Space One',
-    genre:  'deep space · ambient',
-    url:    'https://ice6.somafm.com/deepspaceone-128-mp3',
+    name:  'Drone Zone',
+    genre: 'dark ambient · drone',
+    url:   'https://ice6.somafm.com/dronezone-128-mp3',
   },
   {
-    name:   'Drone Zone',
-    genre:  'dark ambient · drone',
-    url:    'https://ice6.somafm.com/dronezone-128-mp3',
+    name:  'Secret Agent',
+    genre: 'spy · lounge · jazz',
+    url:   'https://ice6.somafm.com/secretagent-128-mp3',
+  },
+  {
+    name:  'Indie Pop Rocks',
+    genre: 'indie · alternative',
+    url:   'https://ice6.somafm.com/indiepop-128-mp3',
+  },
+  {
+    name:  'Illinois Street Lounge',
+    genre: 'lounge · exotica',
+    url:   'https://ice6.somafm.com/illstreet-128-mp3',
+  },
+  {
+    name:  'Boot Liquor',
+    genre: 'americana · roots · country',
+    url:   'https://ice6.somafm.com/bootliquor-128-mp3',
+  },
+  {
+    name:  'Suburbs of Goa',
+    genre: 'psychedelic · indian',
+    url:   'https://ice6.somafm.com/suburbsofgoa-128-mp3',
+  },
+  {
+    name:  'Digitalis',
+    genre: 'idm · electronic',
+    url:   'https://ice6.somafm.com/digitalis-128-mp3',
+  },
+  {
+    name:  'Folk Forward',
+    genre: 'folk · singer-songwriter',
+    url:   'https://ice6.somafm.com/folkfwd-128-mp3',
+  },
+  // ── Radio Paradise ───────────────────────────────────────────────────────
+  {
+    name:  'Radio Paradise',
+    genre: 'eclectic · rock · pop',
+    url:   'https://stream.radioparadise.com/mp3-192',
+  },
+  {
+    name:  'RP Mellow',
+    genre: 'mellow · ambient',
+    url:   'https://stream.radioparadise.com/mellow-mp3-192',
+  },
+  {
+    name:  'RP Rock',
+    genre: 'rock',
+    url:   'https://stream.radioparadise.com/rock-mp3-192',
+  },
+  {
+    name:  'RP Global',
+    genre: 'world music',
+    url:   'https://stream.radioparadise.com/global-mp3-192',
+  },
+  // ── Public Radio ─────────────────────────────────────────────────────────
+  {
+    name:  'KEXP 90.3',
+    genre: 'indie · alternative · seattle',
+    url:   'https://live-mp3-128.kexp.org/kexp128.mp3',
+  },
+  {
+    name:  'WFMU',
+    genre: 'freeform · experimental',
+    url:   'https://stream0.wfmu.org/freeform-128k',
+  },
+  {
+    name:  'FIP',
+    genre: 'jazz · eclectic · world',
+    url:   'https://icecast.radiofrance.fr/fip-hifi.aac',
+  },
+  {
+    name:  'FIP Rock',
+    genre: 'rock · france',
+    url:   'https://icecast.radiofrance.fr/fiprock-hifi.aac',
   },
 ];
 
