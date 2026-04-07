@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Box Radio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="scene">
+    <div class="box">
+
+      <div class="box__top">
+        <span class="box__brand">BOX RADIO</span>
+        <span class="box__dot" id="status-dot"></span>
+      </div>
+
+      <div class="box__speaker">
+        <div class="box__grille"></div>
+        <div class="box__glow"></div>
+      </div>
+
+      <div class="box__eq" id="eq"></div>
+
+      <div class="box__info">
+        <div class="box__station" id="station-name">—</div>
+        <div class="box__genre" id="genre-name">select a station</div>
+      </div>
+
+      <div class="box__controls">
+        <button class="btn" id="btn-prev" title="Previous">&#8249;</button>
+        <button class="btn btn--play" id="btn-play" title="Play / Pause">&#9654;</button>
+        <button class="btn" id="btn-next" title="Next">&#8250;</button>
+      </div>
+
+      <div class="box__stations" id="station-dots"></div>
+
+      <div class="box__volume">
+        <span class="vol-icon">&#9834;</span>
+        <input type="range" id="volume" min="0" max="1" step="0.02" value="0.7">
+      </div>
+
+    </div>
+  </div>
+
+  <audio id="audio" crossorigin="anonymous"></audio>
+  <script src="app.js"></script>
+</body>
+</html>
