@@ -30,30 +30,15 @@ async function forwardMetadata(request, env) {
 
   for (const node of nodes) {
     try {
-      const upstreamUrl = new URL(node + '/ws');
+      const upstream = new WebSocket(node + '/ws');
 
-      // Use fetch() with WebSocket upgrade headers.
-      // CF Workers: if the upstream accepts, resp.webSocket is the live socket.
-      const resp = await fetch(upstreamUrl.toString(), {
-        headers: {
-          'Upgrade': 'websocket',
-          'Connection': 'Upgrade',
-          'Sec-WebSocket-Key': request.headers.get('Sec-WebSocket-Key') || 'dGhlIHNhbXBsZSBub25jZQ==',
-          'Sec-WebSocket-Version': '13',
-          'Host': upstreamUrl.host,
-        },
+      await new Promise((resolve, reject) => {
+        upstream.addEventListener('open', resolve);
+        upstream.addEventListener('error', reject);
       });
 
-      if (!resp.webSocket) {
-        continue;
-      }
-
-      // Wire upstream socket to a client-facing WebSocketPair.
       const [client, server] = Object.values(new WebSocketPair());
-      const upstream = resp.webSocket;
-
       server.accept();
-      upstream.accept();
 
       upstream.addEventListener('message', ({ data }) => {
         try { server.send(data); } catch (_) {}
