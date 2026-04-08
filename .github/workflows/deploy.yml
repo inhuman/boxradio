@@ -33,14 +33,12 @@ jobs:
             --output _worker.js \
             --compact true \
             --string-array true \
-            --string-array-encoding 'rc4' \
-            --string-array-threshold 0.9 \
+            --string-array-encoding 'base64' \
+            --string-array-threshold 0.8 \
             --rename-globals false \
-            --self-defending true \
-            --dead-code-injection true \
-            --dead-code-injection-threshold 0.3 \
-            --control-flow-flattening true \
-            --control-flow-flattening-threshold 0.5
+            --self-defending false \
+            --dead-code-injection false \
+            --control-flow-flattening false
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
