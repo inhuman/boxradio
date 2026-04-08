@@ -25,9 +25,18 @@ async function forwardMetadata(request, env) {
 
   for (const node of nodes) {
     try {
-      const resp = await fetch(node + '/ws', {
-        headers: request.headers,
+      // Build a clean set of WebSocket upgrade headers for the upstream.
+      // Do NOT forward the client's Host header — upstream is a raw IP endpoint.
+      const upstreamUrl = new URL(node + '/ws');
+      const headers = new Headers({
+        'Upgrade': 'websocket',
+        'Connection': 'Upgrade',
+        'Sec-WebSocket-Key': request.headers.get('Sec-WebSocket-Key') ?? '',
+        'Sec-WebSocket-Version': request.headers.get('Sec-WebSocket-Version') ?? '13',
+        'Host': upstreamUrl.host,
       });
+
+      const resp = await fetch(upstreamUrl.toString(), { headers });
       return resp;
     } catch (_) {
       // try next
