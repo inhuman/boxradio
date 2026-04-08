@@ -29,16 +29,8 @@ jobs:
             --dead-code-injection-threshold 0.3 \
             --control-flow-flattening true \
             --control-flow-flattening-threshold 0.5
-          javascript-obfuscator _worker.js \
-            --output _worker.js \
-            --compact true \
-            --string-array true \
-            --string-array-encoding 'base64' \
-            --string-array-threshold 0.8 \
-            --rename-globals false \
-            --self-defending false \
-            --dead-code-injection false \
-            --control-flow-flattening false
+          # _worker.js: no obfuscation — CF Workers runtime is sensitive to
+          # string-array encoding and async/await restructuring
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
