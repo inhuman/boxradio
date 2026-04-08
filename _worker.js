@@ -49,10 +49,12 @@ async function forwardMetadata(request, env) {
         try { upstream.send(data); } catch (_) {}
       });
       upstream.addEventListener('close', ({ code, reason }) => {
-        try { server.close(code, reason); } catch (_) {}
+        const c = code === 1005 || code === 1006 ? 1011 : code;
+        try { server.close(c, reason || ''); } catch (_) {}
       });
       server.addEventListener('close', ({ code, reason }) => {
-        try { upstream.close(code, reason); } catch (_) {}
+        const c = code === 1005 || code === 1006 ? 1011 : code;
+        try { upstream.close(c, reason || ''); } catch (_) {}
       });
       upstream.addEventListener('error', () => {
         try { server.close(1011, 'upstream error'); } catch (_) {}
