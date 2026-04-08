@@ -10,6 +10,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Obfuscate JS
+        run: |
+          npm install -g javascript-obfuscator
+          javascript-obfuscator app.js \
+            --output app.js \
+            --compact true \
+            --string-array true \
+            --string-array-encoding 'rc4' \
+            --string-array-threshold 0.9 \
+            --rename-globals true \
+            --self-defending true \
+            --dead-code-injection true \
+            --dead-code-injection-threshold 0.3 \
+            --control-flow-flattening true \
+            --control-flow-flattening-threshold 0.5
+          javascript-obfuscator _worker.js \
+            --output _worker.js \
+            --compact true \
+            --string-array true \
+            --string-array-encoding 'rc4' \
+            --string-array-threshold 0.9 \
+            --rename-globals false \
+            --self-defending true \
+            --dead-code-injection true \
+            --dead-code-injection-threshold 0.3 \
+            --control-flow-flattening true \
+            --control-flow-flattening-threshold 0.5
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
