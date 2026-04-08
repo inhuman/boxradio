@@ -1,19 +1,14 @@
 /**
- * Cloudflare Pages Worker — boxradio
+ * boxradio — internet radio player
  *
- * Serves the static player and forwards real-time metadata
- * connections to the nearest available stream node.
- *
- * Env vars (set in Cloudflare Pages → Settings → Environment variables):
- *   STREAM_NODES  comma-separated list of stream node base URLs
- *                 e.g. "http://node1.example.com:9000,http://node2.example.com:9000"
+ * Delivers the player interface and live now-playing track info
+ * from our network of broadcast servers around the world.
  */
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // Real-time now-playing metadata channel
     if (url.pathname === '/ws') {
       return forwardMetadata(request, env);
     }
@@ -32,7 +27,7 @@ async function forwardMetadata(request, env) {
     try {
       return await fetch(`${node}/ws`, { headers: request.headers });
     } catch {
-      // node unreachable, try next
+      // try next
     }
   }
 
