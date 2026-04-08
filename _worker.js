@@ -18,11 +18,6 @@ export default {
 };
 
 async function forwardMetadata(request, env) {
-  const upgradeHeader = request.headers.get('Upgrade');
-  if (!upgradeHeader || upgradeHeader.toLowerCase() !== 'websocket') {
-    return new Response('expected websocket', { status: 426 });
-  }
-
   const nodes = (env.STREAM_NODES ?? '')
     .split(',')
     .map(s => s.trim())
@@ -30,36 +25,12 @@ async function forwardMetadata(request, env) {
 
   for (const node of nodes) {
     try {
-      const upstream = new WebSocket(node + '/ws');
-
-      // Wait for upstream to connect before wiring the pair.
-      await new Promise((resolve, reject) => {
-        upstream.addEventListener('open', resolve);
-        upstream.addEventListener('error', reject);
+      const resp = await fetch(node + '/ws', {
+        headers: request.headers,
       });
-
-      const [client, server] = Object.values(new WebSocketPair());
-      server.accept();
-
-      upstream.addEventListener('message', ({ data }) => {
-        try { server.send(data); } catch (_) {}
-      });
-      server.addEventListener('message', ({ data }) => {
-        try { upstream.send(data); } catch (_) {}
-      });
-      upstream.addEventListener('close', ({ code, reason }) => {
-        try { server.close(code, reason); } catch (_) {}
-      });
-      server.addEventListener('close', ({ code, reason }) => {
-        try { upstream.close(code, reason); } catch (_) {}
-      });
-      upstream.addEventListener('error', () => {
-        try { server.close(1011, 'upstream error'); } catch (_) {}
-      });
-
-      return new Response(null, { status: 101, webSocket: client });
+      return resp;
     } catch (_) {
-      // try next node
+      // try next
     }
   }
 
