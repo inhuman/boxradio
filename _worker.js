@@ -39,6 +39,8 @@ async function forwardMetadata(request, env) {
 
       const [client, server] = Object.values(new WebSocketPair());
       server.accept();
+      upstream.binaryType = 'arraybuffer';
+      server.binaryType = 'arraybuffer';
 
       upstream.addEventListener('message', ({ data }) => {
         try { server.send(data); } catch (_) {}
