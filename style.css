@@ -17,7 +17,7 @@ body {
   align-items: center;
   justify-content: center;
   background: var(--bg);
-  font-family: 'Space Mono', monospace;
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
   color: var(--text);
   user-select: none;
 }
