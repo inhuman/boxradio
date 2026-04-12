@@ -14,23 +14,10 @@ jobs:
         with:
           node-version: 20
 
-      - name: Obfuscate JS
+      - name: Minify JS
         run: |
-          npm install -g javascript-obfuscator
-          javascript-obfuscator app.js \
-            --output app.js \
-            --compact true \
-            --string-array true \
-            --string-array-encoding 'rc4' \
-            --string-array-threshold 0.9 \
-            --rename-globals true \
-            --self-defending true \
-            --dead-code-injection true \
-            --dead-code-injection-threshold 0.3 \
-            --control-flow-flattening true \
-            --control-flow-flattening-threshold 0.5
-          # _worker.js: no obfuscation — CF Workers runtime is sensitive to
-          # string-array encoding and async/await restructuring
+          npm install -g terser
+          terser app.js --compress --mangle --output app.js
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
