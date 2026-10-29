@@ -64,32 +64,7 @@ const STATIONS = [
     genre: 'eclectic · rock · pop',
     url:   'https://stream.radioparadise.com/mp3-192',
   },
-  {
-    name:  'RP Mellow',
-    genre: 'mellow · ambient',
-    url:   'https://stream.radioparadise.com/mellow-mp3-192',
-  },
-  {
-    name:  'RP Rock',
-    genre: 'rock',
-    url:   'https://stream.radioparadise.com/rock-mp3-192',
-  },
-  {
-    name:  'RP Global',
-    genre: 'world music',
-    url:   'https://stream.radioparadise.com/global-mp3-192',
-  },
   // ── Public Radio ─────────────────────────────────────────────────────────
-  {
-    name:  'KEXP 90.3',
-    genre: 'indie · alternative · seattle',
-    url:   'https://live-mp3-128.kexp.org/kexp128.mp3',
-  },
-  {
-    name:  'WFMU',
-    genre: 'freeform · experimental',
-    url:   'https://stream0.wfmu.org/freeform-128k',
-  },
   {
     name:  'FIP',
     genre: 'jazz · eclectic · world',
@@ -99,6 +74,49 @@ const STATIONS = [
     name:  'FIP Rock',
     genre: 'rock · france',
     url:   'https://icecast.radiofrance.fr/fiprock-hifi.aac',
+  },
+  // ── Ambient ──────────────────────────────────────────────────────────────
+  {
+    name:  'Space Station Soma',
+    genre: 'ambient · electronica',
+    url:   'https://ice6.somafm.com/spacestation-128-mp3',
+  },
+  {
+    name:  'Спокойное радио',
+    genre: 'ambient · calm',
+    url:   'https://listen9.myradio24.com/6262',
+  },
+  // ── Chillstep · Chillout ─────────────────────────────────────────────────
+  {
+    name:  'CalmFlow',
+    genre: 'chillstep · lo-fi',
+    url:   'https://stream.24dubstep.pl/listen/chillstep/mp3_normal',
+  },
+  {
+    name:  'Café del Mar',
+    genre: 'chillout · balearic',
+    url:   'https://streams.radio.co/se1a320b47/listen',
+  },
+  {
+    name:  '0N Chillout',
+    genre: 'chillout · downtempo',
+    url:   'https://0n-chillout.radionetz.de/0n-chillout.aac',
+  },
+  // ── Bossa Nova ───────────────────────────────────────────────────────────
+  {
+    name:  'Monte Carlo Bossa Nova',
+    genre: 'bossa nova · lounge',
+    url:   'https://mc-mcbossa.hostingradio.ru/mcbossa96.aacp',
+  },
+  {
+    name:  'Bossa Jazz Brasil',
+    genre: 'bossa nova · jazz',
+    url:   'https://centova5.transmissaodigital.com:20104/live',
+  },
+  {
+    name:  '100% Covers Lounge',
+    genre: 'bossa · lounge · covers',
+    url:   'https://az1.mediacp.eu/listen/100coverslounge/radio.mp3',
   },
 ];
 
