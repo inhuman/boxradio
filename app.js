@@ -151,23 +151,7 @@ const btnPlay    = document.getElementById('btn-play');
 const btnPrev    = document.getElementById('btn-prev');
 const btnNext    = document.getElementById('btn-next');
 const volumeEl   = document.getElementById('volume');
-const eqEl       = document.getElementById('eq');
 const dotsEl     = document.getElementById('station-dots');
-
-// ── build EQ bars ─────────────────────────────────────────────────────────────
-const EQ_COUNT = 18;
-const bars = Array.from({ length: EQ_COUNT }, (_, i) => {
-  const bar = document.createElement('div');
-  bar.className = 'eq-bar';
-  // stagger duration and peak for organic feel
-  const dur  = (.55 + Math.random() * .7).toFixed(2) + 's';
-  const peak = (2.5 + Math.random() * 4).toFixed(1);
-  bar.style.setProperty('--dur',  dur);
-  bar.style.setProperty('--peak', peak);
-  bar.style.animationDelay = (Math.random() * -.8).toFixed(2) + 's';
-  eqEl.appendChild(bar);
-  return bar;
-});
 
 // ── build station dots ────────────────────────────────────────────────────────
 const dots = STATIONS.map((_, i) => {
