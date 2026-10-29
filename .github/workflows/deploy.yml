@@ -10,18 +10,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-go@v5
         with:
-          node-version: 20
+          go-version: '1.26'
 
-      - name: Minify JS
-        run: |
-          npm install -g terser
-          terser app.js --compress --mangle --output app.js
+      - name: Build linux binary
+        run: GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o boxradio .
 
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+      - name: Copy files to VPS
+        uses: appleboy/scp-action@v0.1.7
         with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy . --project-name=boxradio --branch=main
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          source: "boxradio,index.html,app.js,style.css"
+          target: ${{ secrets.DEPLOY_PATH }}/incoming
+
+      - name: Install and restart
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            chmod +x incoming/boxradio
+            mv -f incoming/boxradio boxradio
+            mv -f incoming/index.html incoming/app.js incoming/style.css .
+            rmdir incoming
+            sudo systemctl restart boxradio
