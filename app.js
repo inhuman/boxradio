@@ -206,25 +206,6 @@ audio.addEventListener('ended', () => setPlaying(false));
 audio.volume = +volumeEl.value;
 volumeEl.addEventListener('input', () => { audio.volume = +volumeEl.value; });
 
-// ── WebSocket — live metadata ──────────────────────────────────────────────────
-// Connects to /ws to receive now-playing metadata updates.
-// Silently reconnects on drop; parse errors are discarded.
-(function connectWS() {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const ws = new WebSocket(`${proto}://${location.host}/ws`);
-
-  ws.addEventListener('message', ({ data }) => {
-    try {
-      const msg = JSON.parse(data);
-      if (msg.station) stationEl.textContent = msg.station;
-      if (msg.track)   genreEl.textContent   = msg.track;
-    } catch { /* binary protocol or malformed — ignore */ }
-  });
-
-  ws.addEventListener('close',   () => setTimeout(connectWS, 4000));
-  ws.addEventListener('error',   () => ws.close());
-})();
-
 // ── init ──────────────────────────────────────────────────────────────────────
 loadStation(current);
 updateDots();
