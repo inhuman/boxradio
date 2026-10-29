@@ -83,40 +83,6 @@ body {
   50%      { opacity: .35; }
 }
 
-/* ── speaker ── */
-.box__speaker {
-  position: relative;
-  height: 148px;
-  border-radius: 12px;
-  overflow: hidden;
-  background: #0a0a0a;
-  border: 1px solid #1a1a1a;
-}
-
-.box__grille {
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(circle, #282828 1.2px, transparent 1.2px);
-  background-size: 10px 10px;
-  background-position: 5px 5px;
-}
-
-.box__glow {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at 50% 60%, rgba(232,160,64,.07) 0%, transparent 70%);
-  transition: opacity .6s;
-  opacity: 0;
-}
-.box--playing .box__glow {
-  opacity: 1;
-  animation: pulse-glow 3s ease-in-out infinite;
-}
-@keyframes pulse-glow {
-  0%,100% { opacity: .6; }
-  50%      { opacity: 1; }
-}
-
 /* ── info ── */
 .box__info {
   text-align: center;
@@ -181,31 +147,6 @@ body {
   box-shadow: 0 0 12px rgba(232,160,64,.2);
 }
 
-/* ── station dots ── */
-.box__stations {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-}
-
-.s-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--box-border);
-  border: 1px solid #2a2a2a;
-  cursor: pointer;
-  transition: background .25s, box-shadow .25s, transform .15s;
-}
-.s-dot:hover {
-  background: var(--amber-dim);
-  transform: scale(1.2);
-}
-.s-dot.active {
-  background: var(--amber);
-  box-shadow: 0 0 6px rgba(232,160,64,.5);
-}
-
 /* ── volume ── */
 .box__volume {
   display: flex;
@@ -254,10 +195,105 @@ input[type=range]::-webkit-slider-thumb:hover {
     gap: 24px;
     padding: 28px 26px calc(24px + env(safe-area-inset-bottom));
   }
-  .box__speaker { flex: 1 1 auto; height: auto; min-height: 180px; }
+  .box__list { flex: 1 1 auto; min-height: 0; max-height: none; }
   .box__station { font-size: 16px; }
   .box__genre   { font-size: 11px; }
   .btn       { width: 44px; height: 44px; font-size: 20px; }
   .btn--play { width: 58px; height: 58px; }
-  .s-dot     { width: 10px; height: 10px; }
+}
+
+/* ── filter chips ── */
+.box__filter { display: flex; gap: 8px; }
+.chip {
+  flex: 1;
+  background: none;
+  border: 1px solid var(--box-border);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 7px 0;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: .1em;
+  cursor: pointer;
+  transition: color .2s, border-color .2s, background .2s;
+}
+.chip:hover { color: var(--text); border-color: #333; }
+.chip.active { color: var(--amber); border-color: var(--amber-dim); background: rgba(232,160,64,.06); }
+
+/* ── station list ── */
+.box__list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 2px;
+}
+@media (min-width: 561px) { .box__list { max-height: 260px; } }
+.box__list::-webkit-scrollbar { width: 5px; }
+.box__list::-webkit-scrollbar-thumb { background: var(--box-border); border-radius: 3px; }
+
+.station {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+.station.active { border-color: var(--amber-dim); background: rgba(232,160,64,.06); }
+
+.station__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  background: none;
+  border: none;
+  color: inherit;
+  font-family: inherit;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.station__name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.station.active .station__name { color: var(--amber); }
+.station__genre {
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.station__fav {
+  flex-shrink: 0;
+  width: 34px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color .2s, transform .15s;
+}
+.station__fav:hover { color: var(--amber-dim); transform: scale(1.15); }
+.station__fav.on { color: var(--amber); }
+
+.list-empty {
+  text-align: center;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 24px 0;
+  letter-spacing: .06em;
 }

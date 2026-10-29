@@ -16,14 +16,16 @@
         <span class="box__dot" id="status-dot"></span>
       </div>
 
-      <div class="box__speaker">
-        <div class="box__grille"></div>
-        <div class="box__glow"></div>
+      <div class="box__filter" id="filter">
+        <button class="chip active" data-f="all">ВСЕ</button>
+        <button class="chip" data-f="fav">★ ИЗБРАННОЕ</button>
       </div>
+
+      <div class="box__list" id="list"></div>
 
       <div class="box__info">
         <div class="box__station" id="station-name">—</div>
-        <div class="box__genre" id="genre-name">select a station</div>
+        <div class="box__genre" id="genre-name">выберите станцию</div>
       </div>
 
       <div class="box__controls">
@@ -31,8 +33,6 @@
         <button class="btn btn--play" id="btn-play" title="Play / Pause">&#9654;</button>
         <button class="btn" id="btn-next" title="Next">&#8250;</button>
       </div>
-
-      <div class="box__stations" id="station-dots"></div>
 
       <div class="box__volume">
         <span class="vol-icon">&#9834;</span>

@@ -143,7 +143,6 @@ let playing  = false;
 
 // ── elements ──────────────────────────────────────────────────────────────────
 const audio      = document.getElementById('audio');
-const box        = document.querySelector('.box');
 const statusDot  = document.getElementById('status-dot');
 const stationEl  = document.getElementById('station-name');
 const genreEl    = document.getElementById('genre-name');
@@ -151,21 +150,100 @@ const btnPlay    = document.getElementById('btn-play');
 const btnPrev    = document.getElementById('btn-prev');
 const btnNext    = document.getElementById('btn-next');
 const volumeEl   = document.getElementById('volume');
-const dotsEl     = document.getElementById('station-dots');
+const listEl     = document.getElementById('list');
+const filterEl   = document.getElementById('filter');
 
-// ── build station dots ────────────────────────────────────────────────────────
-const dots = STATIONS.map((_, i) => {
-  const d = document.createElement('button');
-  d.className = 'btn s-dot';
-  d.title = STATIONS[i].name;
-  d.addEventListener('click', () => switchTo(i, true));
-  dotsEl.appendChild(d);
-  return d;
-});
+// ── favorites (persisted by station url) ────────────────────────────────────────
+const FAV_KEY = 'boxradio:favs';
 
-function updateDots() {
-  dots.forEach((d, i) => d.classList.toggle('active', i === current));
+function loadFavs() {
+  try {
+    const v = JSON.parse(localStorage.getItem(FAV_KEY));
+    return new Set(Array.isArray(v) ? v : []);
+  } catch { return new Set(); }
 }
+
+const favs = loadFavs();
+
+function saveFavs() {
+  try { localStorage.setItem(FAV_KEY, JSON.stringify([...favs])); } catch { /* ignore */ }
+}
+
+function isFav(idx) {
+  return favs.has(STATIONS[idx].url);
+}
+
+function toggleFav(idx) {
+  const url = STATIONS[idx].url;
+  if (favs.has(url)) favs.delete(url); else favs.add(url);
+  saveFavs();
+  buildList();
+}
+
+// ── station list ────────────────────────────────────────────────────────────────
+let filter = 'all'; // 'all' | 'fav'
+
+function buildList() {
+  listEl.textContent = '';
+  const shown = STATIONS.map((_, i) => i).filter(i => filter === 'all' || isFav(i));
+
+  if (shown.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'list-empty';
+    empty.textContent = 'нет избранных станций';
+    listEl.appendChild(empty);
+    return;
+  }
+
+  for (const i of shown) {
+    const s = STATIONS[i];
+
+    const row = document.createElement('div');
+    row.className = 'station' + (i === current ? ' active' : '');
+    row.dataset.idx = i;
+
+    const main = document.createElement('button');
+    main.className = 'station__main';
+    const name = document.createElement('span');
+    name.className = 'station__name';
+    name.textContent = s.name;
+    const genre = document.createElement('span');
+    genre.className = 'station__genre';
+    genre.textContent = s.genre;
+    main.append(name, genre);
+    main.addEventListener('click', () => switchTo(i, true));
+
+    const fav = document.createElement('button');
+    fav.className = 'station__fav' + (isFav(i) ? ' on' : '');
+    fav.textContent = isFav(i) ? '★' : '☆';
+    fav.title = 'В избранное';
+    fav.addEventListener('click', () => toggleFav(i));
+
+    row.append(main, fav);
+    listEl.appendChild(row);
+  }
+}
+
+function highlightActive() {
+  for (const row of listEl.children) {
+    if (row.dataset.idx !== undefined) {
+      row.classList.toggle('active', Number(row.dataset.idx) === current);
+    }
+  }
+}
+
+function scrollActiveIntoView() {
+  const row = listEl.querySelector('.station.active');
+  if (row) row.scrollIntoView({ block: 'nearest' });
+}
+
+filterEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('.chip');
+  if (!btn) return;
+  filter = btn.dataset.f;
+  for (const c of filterEl.children) c.classList.toggle('active', c === btn);
+  buildList();
+});
 
 // ── station info ──────────────────────────────────────────────────────────────
 function loadStation(idx) {
@@ -179,7 +257,8 @@ function switchTo(idx, autoplay = false) {
   current = (idx + STATIONS.length) % STATIONS.length;
   try { localStorage.setItem(STORE_KEY, String(current)); } catch { /* ignore */ }
   loadStation(current);
-  updateDots();
+  highlightActive();
+  scrollActiveIntoView();
   if (autoplay || playing) {
     audio.play().catch(() => {});
   }
@@ -188,7 +267,6 @@ function switchTo(idx, autoplay = false) {
 // ── play / pause ──────────────────────────────────────────────────────────────
 function setPlaying(state) {
   playing = state;
-  box.classList.toggle('box--playing', state);
   statusDot.classList.toggle('live', state);
   btnPlay.innerHTML = state ? '&#9646;&#9646;' : '&#9654;';
 }
@@ -214,5 +292,6 @@ audio.volume = +volumeEl.value;
 volumeEl.addEventListener('input', () => { audio.volume = +volumeEl.value; });
 
 // ── init ──────────────────────────────────────────────────────────────────────
+buildList();
 loadStation(current);
-updateDots();
+scrollActiveIntoView();
