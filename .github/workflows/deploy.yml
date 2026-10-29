@@ -24,7 +24,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           password: ${{ secrets.SSH_PASSWORD }}
           port: ${{ secrets.SSH_PORT || '22' }}
-          source: "boxradio,index.html,app.js,style.css"
+          source: "boxradio,index.html,app.js,style.css,favicon.svg"
           target: ${{ secrets.DEPLOY_PATH }}/incoming
 
       - name: Install and restart
@@ -38,7 +38,7 @@ jobs:
             cd ${{ secrets.DEPLOY_PATH }}
             chmod +x incoming/boxradio
             mv -f incoming/boxradio boxradio
-            mv -f incoming/index.html incoming/app.js incoming/style.css .
+            mv -f incoming/index.html incoming/app.js incoming/style.css incoming/favicon.svg .
             rmdir incoming
             sudo systemctl restart boxradio
             # TLS: issue on first deploy, no-op while valid, reissue when expired.
