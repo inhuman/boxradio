@@ -1,0 +1,15 @@
+# build artifacts
+/boxradio
+*.exe
+
+# IDE / AI tool configs
+.idea/
+.vscode/
+.claude/
+
+# secrets & local env
+.env
+*.env
+
+# scratch / measurements (not committed)
+/sdocs/
