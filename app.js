@@ -103,7 +103,19 @@ const STATIONS = [
 ];
 
 // ── state ─────────────────────────────────────────────────────────────────────
-let current  = 0;
+const STORE_KEY = 'boxradio:station';
+
+// restoreStation returns the last-selected station index from localStorage,
+// clamped to a valid range. Falls back to 0 if unset or storage is unavailable.
+function restoreStation() {
+  try {
+    const i = parseInt(localStorage.getItem(STORE_KEY), 10);
+    if (Number.isInteger(i) && i >= 0 && i < STATIONS.length) return i;
+  } catch { /* private mode / disabled storage — ignore */ }
+  return 0;
+}
+
+let current  = restoreStation();
 let playing  = false;
 
 // ── elements ──────────────────────────────────────────────────────────────────
@@ -158,6 +170,7 @@ function loadStation(idx) {
 
 function switchTo(idx, autoplay = false) {
   current = (idx + STATIONS.length) % STATIONS.length;
+  try { localStorage.setItem(STORE_KEY, String(current)); } catch { /* ignore */ }
   loadStation(current);
   updateDots();
   if (autoplay || playing) {
