@@ -75,6 +75,11 @@ const STATIONS = [
     genre: 'rock · france',
     url:   'https://icecast.radiofrance.fr/fiprock-hifi.aac',
   },
+  {
+    name:  'WFMU',
+    genre: 'freeform · experimental',
+    url:   'https://stream0.wfmu.org/freeform-128k',
+  },
   // ── Ambient ──────────────────────────────────────────────────────────────
   {
     name:  'Space Station Soma',
