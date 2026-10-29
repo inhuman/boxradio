@@ -41,3 +41,10 @@ jobs:
             mv -f incoming/index.html incoming/app.js incoming/style.css .
             rmdir incoming
             sudo systemctl restart boxradio
+            # TLS: issue on first deploy, no-op while valid, reissue when expired.
+            # Press "re-run deploy" after a cert expires to regenerate it.
+            if [ -n "${{ secrets.DOMAIN }}" ]; then
+              sudo certbot certonly --nginx -d ${{ secrets.DOMAIN }} \
+                --non-interactive --agree-tos -m ${{ secrets.LE_EMAIL }} \
+                --keep-until-expiring && sudo systemctl reload nginx
+            fi
