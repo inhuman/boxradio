@@ -7,8 +7,6 @@ github.com/goccy/go-reflect v1.2.0 h1:O0T8rZCuNmGXewnATuKYnkL0xm6o8UNOJZd/gOkb9m
 github.com/goccy/go-reflect v1.2.0/go.mod h1:n0oYZn8VcV2CkWTxi8B9QjkCoq6GTtCEdfmR66YhFtE=
 github.com/google/go-cmp v0.5.9 h1:O2Tfq5qg4qc4AmwVlvv0oLiVAGB7enBSJ2x2DqQFi38=
 github.com/google/go-cmp v0.5.9/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
-github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
-github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/inhuman/cleanenv v1.6.0 h1:FL+ckMgVi5Kmtz2j22NSIMDWC5gY5axY1REBK71pFOs=
 github.com/inhuman/cleanenv v1.6.0/go.mod h1:rJqRNAo9dtBx0Krn8zNGta/jXzQEqz9Cby4x7ksfYNY=
 github.com/inhuman/config v0.0.2 h1:CaAkX++C3CoHpQR/VWdO1CsbHRqH0BYO3Ej7bJz9JAM=
