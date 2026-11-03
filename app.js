@@ -138,12 +138,12 @@ function restoreStation() {
   return 0;
 }
 
-let current  = restoreStation();
-let playing  = false;
+let current = restoreStation();
 
 // ── elements ──────────────────────────────────────────────────────────────────
 const audio      = document.getElementById('audio');
 const statusDot  = document.getElementById('status-dot');
+const statusEl   = document.getElementById('stream-status');
 const stationEl  = document.getElementById('station-name');
 const genreEl    = document.getElementById('genre-name');
 const btnPlay    = document.getElementById('btn-play');
@@ -246,46 +246,229 @@ filterEl.addEventListener('click', (e) => {
 });
 
 // ── station info ──────────────────────────────────────────────────────────────
-function loadStation(idx) {
-  const s = STATIONS[idx];
-  stationEl.textContent = s.name;
-  genreEl.textContent   = s.genre;
-  audio.src = s.url;
+function showStation() {
+  stationEl.textContent = STATIONS[current].name;
+  genreEl.textContent   = STATIONS[current].genre;
 }
 
+// ── playback state ────────────────────────────────────────────────────────────
+// wantsPlay is the user's intent, not the state of the <audio> element. A live
+// stream can be dead or reconnecting while the user still wants it on; keeping
+// intent separate keeps the button on "pause" while recovery restarts the
+// stream (selecting a new source momentarily puts the element back to paused).
+let wantsPlay = false;
+let status = 'idle'; // 'idle' | 'live' | 'retry'
+
+function setStatus(next) {
+  if (status === next) return;
+  status = next;
+  statusDot.classList.toggle('live', next === 'live');
+  statusDot.classList.toggle('retry', next === 'retry');
+  statusEl.classList.toggle('retry', next === 'retry');
+  statusEl.textContent =
+    next === 'live'  ? 'эфир' :
+    next === 'retry' ? 'переподключение' : '';
+}
+
+function setIntent(on) {
+  wantsPlay = on;
+  btnPlay.innerHTML = on ? '&#9646;&#9646;' : '&#9654;';
+  if (!on) setStatus('idle');
+}
+
+// ── stream recovery ───────────────────────────────────────────────────────────
+// Live streams die quietly. When a station or the network drops the connection,
+// the browser often fires no `error` at all: currentTime simply stops advancing
+// and the element waits forever. play() does not revive it — the resource has
+// to be selected again, which is exactly what "switch to another station and
+// back" did by hand. The code below does that on its own.
+const CONNECT_MS = 20000; // no audio at all after (re)connecting
+const STALL_MS   = 5000;  // playback was running, then went silent
+const HEALTHY_MS = 15000; // playback long enough to reset the backoff
+const RETRY_MS   = [0, 1000, 2000, 4000, 8000, 15000]; // then 15s forever
+
+let retryTimer = null;
+let healthyTimer = null;
+let lastFailureAt = 0;  // last time the stream failed / recovery was scheduled
+let retries = 0;
+let lastTime = 0;       // last known currentTime
+let lastProgressAt = 0; // when playback last actually moved
+
+function playAudio() {
+  if (!wantsPlay) return;
+  const p = audio.play();
+  if (!p) return;
+  // play() resolves even if the user pressed pause mid-connect; don't let a
+  // pending promise undo that.
+  p.then(() => { if (!wantsPlay) audio.pause(); }).catch(onPlayRejected);
+}
+
+function onPlayRejected(err) {
+  if (!wantsPlay) return;
+  if (err && err.name === 'NotAllowedError') {
+    // The browser refused to start audio without a user gesture; retrying
+    // would only spin the watchdog, so drop back to paused.
+    stopPlayback();
+    return;
+  }
+  scheduleReconnect();
+}
+
+// reloadStation selects the current station's stream from scratch. Clearing the
+// source and calling load() resets a stalled / errored element; assigning the
+// URL opens a new connection. Assigning src does not fire `pause`, so recovery
+// never looks like the user pressed pause.
+function reloadStation() {
+  if (!wantsPlay) return;
+  clearTimeout(retryTimer);
+  retryTimer = null;
+
+  audio.removeAttribute('src');
+  audio.load();
+  audio.src = STATIONS[current].url;
+  audio.load();
+
+  lastTime = 0;
+  lastProgressAt = Date.now();
+  setStatus('retry');
+  playAudio();
+}
+
+function scheduleReconnect() {
+  if (!wantsPlay || retryTimer) return;
+  const delay = RETRY_MS[Math.min(retries, RETRY_MS.length - 1)];
+  retries++;
+  lastFailureAt = Date.now();
+  setStatus('retry');
+  retryTimer = setTimeout(reloadStation, delay);
+}
+
+function startPlayback() {
+  setIntent(true);
+  retries = 0;
+  lastFailureAt = 0;
+  // Always dial a fresh connection: a paused live stream holds stale buffered
+  // audio and would resume seconds behind the live edge.
+  reloadStation();
+}
+
+function stopPlayback() {
+  clearTimeout(retryTimer);
+  retryTimer = null;
+  clearTimeout(healthyTimer);
+  healthyTimer = null;
+  retries = 0;
+  setIntent(false);
+  audio.pause();
+  // Close the stream connection rather than leaving it downloading while
+  // paused; playback always dials a fresh connection anyway.
+  audio.removeAttribute('src');
+  audio.load();
+}
+
+// ── controls ──────────────────────────────────────────────────────────────────
 function switchTo(idx, autoplay = false) {
   current = (idx + STATIONS.length) % STATIONS.length;
   try { localStorage.setItem(STORE_KEY, String(current)); } catch { /* ignore */ }
-  loadStation(current);
+
+  clearTimeout(retryTimer);
+  retryTimer = null;
+  clearTimeout(healthyTimer);
+  healthyTimer = null;
+  retries = 0;
+
+  showStation();
   highlightActive();
   scrollActiveIntoView();
-  if (autoplay || playing) {
-    audio.play().catch(() => {});
-  }
-}
 
-// ── play / pause ──────────────────────────────────────────────────────────────
-function setPlaying(state) {
-  playing = state;
-  statusDot.classList.toggle('live', state);
-  btnPlay.innerHTML = state ? '&#9646;&#9646;' : '&#9654;';
+  if (autoplay || wantsPlay) {
+    startPlayback();
+  } else {
+    // Nothing to play: drop the old source instead of leaving the paused
+    // element holding a connection to the previous station.
+    audio.removeAttribute('src');
+    audio.load();
+    setStatus('idle');
+  }
 }
 
 btnPlay.addEventListener('click', () => {
-  if (audio.paused) {
-    if (!audio.src) loadStation(current);
-    audio.play().catch(() => {});
-  } else {
-    audio.pause();
-  }
+  if (wantsPlay) stopPlayback();
+  else startPlayback();
 });
 
-btnPrev.addEventListener('click', () => switchTo(current - 1, playing));
-btnNext.addEventListener('click', () => switchTo(current + 1, playing));
+btnPrev.addEventListener('click', () => switchTo(current - 1, wantsPlay));
+btnNext.addEventListener('click', () => switchTo(current + 1, wantsPlay));
 
-audio.addEventListener('play',  () => setPlaying(true));
-audio.addEventListener('pause', () => setPlaying(false));
-audio.addEventListener('ended', () => setPlaying(false));
+// ── stream events ─────────────────────────────────────────────────────────────
+audio.addEventListener('playing', () => {
+  setStatus('live');
+  lastTime = audio.currentTime;
+  lastProgressAt = Date.now();
+  clearTimeout(healthyTimer);
+  // Only a stream that stays up resets the backoff, so a station that dies
+  // right after connecting backs off instead of reconnecting in a tight loop.
+  healthyTimer = setTimeout(() => { retries = 0; }, HEALTHY_MS);
+});
+
+// A stall starts the silence clock; the stream may still recover on its own.
+audio.addEventListener('waiting', () => {
+  if (wantsPlay) lastProgressAt = Date.now();
+});
+
+audio.addEventListener('pause', () => {
+  if (!wantsPlay) return;  // stopPlayback() already handled it
+  if (audio.ended) return; // a live stream ran dry; `ended` reconnects
+
+  // A failed stream pauses the element too. Chrome sets error and fires
+  // `error` first, but recovery may already have reset the element, so also
+  // ignore pauses that arrive right after a failure was reported.
+  if (audio.error || retryTimer) return;
+  if (Date.now() - lastFailureAt < 2000) return;
+
+  stopPlayback();
+});
+
+audio.addEventListener('ended', () => {
+  if (wantsPlay) scheduleReconnect();
+});
+
+audio.addEventListener('error', () => {
+  if (wantsPlay) scheduleReconnect();
+});
+
+// Watchdog: a dead stream can sit forever in a half-dead state where
+// currentTime never moves and no error is raised. Silence is the only reliable
+// failure signal for live audio, so treat it as a dropped connection.
+setInterval(() => {
+  if (!wantsPlay || retryTimer) return;
+  if (audio.paused || audio.ended || audio.seeking) return;
+
+  const t = audio.currentTime;
+  if (Number.isFinite(t) && t !== lastTime) {
+    lastTime = t;
+    lastProgressAt = Date.now();
+    return;
+  }
+
+  const deadline = lastTime > 0 ? STALL_MS : CONNECT_MS;
+  if (Date.now() - lastProgressAt > deadline) scheduleReconnect();
+}, 1000);
+
+// Coming back online: retry right away instead of waiting out the backoff,
+// but leave healthy playback alone.
+window.addEventListener('online', () => {
+  if (!wantsPlay || Date.now() - lastProgressAt < 3000) return;
+  retries = 0;
+  reloadStation();
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !wantsPlay) return;
+  // Phone browsers suspend <audio> when the screen locks. Dial in fresh
+  // instead of resuming a buffer that is already behind the live edge.
+  if (audio.paused && !audio.ended) reloadStation();
+});
 
 // ── volume ────────────────────────────────────────────────────────────────────
 audio.volume = +volumeEl.value;
@@ -293,5 +476,5 @@ volumeEl.addEventListener('input', () => { audio.volume = +volumeEl.value; });
 
 // ── init ──────────────────────────────────────────────────────────────────────
 buildList();
-loadStation(current);
+showStation();
 scrollActiveIntoView();

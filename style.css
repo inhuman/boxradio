@@ -62,6 +62,21 @@ body {
   opacity: .9;
 }
 
+.box__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.box__status {
+  font-size: 9px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  transition: color .4s;
+}
+.box__status.retry { color: var(--amber-dim); }
+
 .box__dot {
   width: 7px;
   height: 7px;
@@ -73,6 +88,11 @@ body {
   background: #e84040;
   box-shadow: 0 0 6px #e84040aa;
   animation: blink 2s ease-in-out infinite;
+}
+.box__dot.retry {
+  background: var(--amber);
+  box-shadow: 0 0 6px rgba(232,160,64,.45);
+  animation: blink 1s ease-in-out infinite;
 }
 @keyframes blink {
   0%,100% { opacity: 1; }
