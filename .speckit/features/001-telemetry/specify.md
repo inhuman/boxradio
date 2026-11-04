@@ -1,6 +1,6 @@
 # 001 — Playback telemetry
 
-**Status:** specified · **Branch:** `feat/telemetry` · **Owner:** maintainer (single developer)
+**Status:** specified, clarified 2026-11-05 · **Branch:** `feat/telemetry` · **Owner:** maintainer (single developer)
 
 ## Why
 
@@ -66,8 +66,8 @@ As the maintainer, when a listener says "the radio doesn't work on my phone", I 
 sessions from that platform and see the phase sequence, the terminal phase and the failure reason,
 without asking the listener anything beyond roughly when it happened.
 *Acceptance:* given a time window and a platform family, the session is found by the rule in SC-015
-and shows a complete ordered phase history — no session reference needs to be read off the
-listener's screen.
+and shows a complete ordered phase history plus the build it came from — no session reference needs
+to be read off the listener's screen.
 
 **US-2 — Separate a dead station from a broken client.**
 As the maintainer, I can group failures by station and by platform, so that "every station fails on
@@ -108,6 +108,8 @@ the records of the last 24 hours ordered by session.
 Captured (allow-list, nothing outside it):
 
 - a session reference, random per page load, not stored in the browser, not stable across visits;
+- the player build identifier (short, non-secret), so a session can be attributed to the code that
+  produced it — without it a report cannot be placed on the before/after side of a fix;
 - platform family — one of `ios`, `android`, `desktop`, `unknown` — and browser family — one of
   `safari`, `chrome`, `firefox`, `other`, `unknown` — with a version, derived from the user agent
   and truncated;
@@ -129,7 +131,8 @@ Not captured:
 - anything the listener types; there is no input in the product;
 - page views, clicks, scroll, hover, or time spent outside playback;
 - free-form strings from the client: every field is a small enumerated or numeric value, except the
-  station identity and a truncated user-agent.
+  station identity, the build identifier (which identifies code, not a listener) and a truncated
+  user-agent.
 
 Honest limitation, stated rather than hidden: the record necessarily shows which station played and
 when the session happened. That is accepted because it is first-party, retained for 30 days, never
@@ -154,6 +157,7 @@ joined to an identity, and never shared.
 | SC-013 | Time to diagnosis: from "it doesn't work on my phone" to a full phase history in under 5 minutes of maintainer work. |
 | SC-014 | Flood resistance: at most the session budget is accepted per session reference; a source sending 100× normal volume is rejected or rate-limited without dropping other sessions' records and without increasing the delay the player sees. |
 | SC-015 | Lookup rule: a session is identifiable from a ±15 minute time window plus platform family; when several sessions match, failures are listed before sessions that played; when one matches, the result is unambiguous. |
+| SC-016 | Every record carries the player build identifier, and sessions can be grouped by build, so a report is attributable to pre- or post-fix code. |
 
 ## Edge cases
 
@@ -173,6 +177,8 @@ joined to an identity, and never shared.
 | EC-12 | Station URL is mixed content (http on an https page) | Recorded as that specific failure reason. |
 | EC-13 | Session id is invented or replayed by a third party | Worst case is a bogus record; no other record is affected, nothing is deleted or overwritten. |
 | EC-14 | User agent is missing, enormous, or spoofed | Truncated and classified as "unknown"; still a valid record. |
+| EC-15 | Browser sends the privacy signal by default (Firefox ships GPC on) | Nothing is sent, by design. This is expected and must not be diagnosed as a telemetry bug — the absence of Firefox sessions is the opt-out working. |
+| EC-16 | Record arrives without a build identifier (a cached older player) | Stored as `unknown`; still a valid record, just not attributable to a build. |
 
 ## Constraints from the constitution
 
@@ -200,11 +206,18 @@ joined to an identity, and never shared.
   themselves and are not covered.
 - Synthetic monitoring, uptime checks, and telemetry from any client other than the player.
 
-## Open questions (for `/speckit-clarify`)
+## Resolved decisions (`/speckit-clarify`, 2026-11-05)
 
-| ID | Question | Default if unanswered |
-|---|---|---|
-| Q-1 | Is 30-day retention right, or should it be shorter (7 days) for a single-user product? | 30 days, as specified |
-| Q-2 | Honour Global Privacy Control only, or also Do Not Track? | Both, as specified in SC-012 |
-| Q-3 | Is storing the exact station identity acceptable, or should it be a per-deployment opaque token? | Exact identity; it is first-party and short-lived |
-| Q-4 | Is this one feature, or should "collect" and "read the records" be split? | One feature; reading is a command, not a product |
+All four open questions plus one gap found during the read-back are settled. Nothing here is
+re-openable by `/speckit-plan`; changing a decision means returning to this step.
+
+| ID | Question | Decision | Consequence |
+|---|---|---|---|
+| D-1 | Retention period | **30 days** | Long enough to handle a report that arrives late; short enough to be defensible. Enforced by SC-010. |
+| D-2 | Station identity | **Exact name and URL** | Diagnosis is direct ("which station is broken, for whom"). Accepted because it is first-party, 30 days, never joined to an identity. |
+| D-3 | Opt-out signal | **GPC and DNT, both honoured** | Firefox ships GPC on by default, so Firefox sessions will be absent by design — recorded as EC-15 so nobody debugs the gap later. |
+| D-4 | Player build in the record | **Yes** | Without it, a report after a fix cannot be placed on the right side of that fix. Adds SC-016 and one allow-list field. |
+| D-5 | Feature boundaries | **One feature: collect + read by command** | Reading is a server-side command, not a product surface. Any dashboard, chart or query UI is a separate feature and needs its own spec. |
+
+Two things this step deliberately did *not* decide, because they belong to `/speckit-plan`: where
+records are stored and how retention is enforced. The spec only fixes the outcomes (SC-009, SC-010).
