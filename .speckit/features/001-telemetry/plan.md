@@ -77,9 +77,11 @@ spec; `platform`/`browser` are derived, never echoed from the client.
 
 ### Reading
 
-`boxradio -telemetry-dump -since 24h [-platform ios] [-station "FIP"] [-failed] [-json]` prints
-sessions ordered by `received_at`, failures first (SC-015), each with its phase timeline, first-sound
-offset and build. `-json` gives raw records for `jq`.
+`boxradio -telemetry-dump -since 24h [-from … -to …] [-platform ios] [-station "FIP"] [-failed] [-count] [-json]`
+prints sessions ordered by `(received_at, seq)`, failures first (SC-015), each with its phase
+timeline, first-sound offset and build. `-from/-to` is what makes a 15-minute lookup window
+expressible; `-count` groups sessions reaching `эфир` against failing ones per station and platform
+(SC-004), so counting stays one command rather than a second tool. `-json` gives raw records for `jq`.
 
 ## Operations delta (this is the expensive part — see Risks)
 
@@ -106,8 +108,9 @@ collector blocked, the player matrix is unchanged. Covers SC-001…SC-003, SC-00
 SC-012, SC-016. **Milestone M2** (a session from the phone is visible on the server).
 
 **P3 — Reading and diagnosis.**
-Filters, failures-first ordering, session timeline rendering, and a worked reconstruction of the
-2026-11 iOS stuck state (buffered, never played) from records alone.
+Filters, time-range lookup, failures-first ordering, counting per station/platform, session
+timeline rendering, and a worked reconstruction of the 2026-11 iOS stuck state (buffered, never
+played) from records alone.
 *Done when:* the stuck state is recognised from `-telemetry-dump` output in under 5 minutes, without
 reading the player code. Covers SC-002, SC-013, SC-015. **Milestone M3.**
 

@@ -33,8 +33,10 @@ wrong, P2 hides it.
 - [ ] **T008** Deduplicate `(sid, seq)` with a bounded in-memory LRU plus a reader-side check. `(M)`
 - [ ] **T009** Prune: run at start and every 24 h; delete day files older than 30 days, then evict
       oldest until the directory is under 50 MB. `(M)`
-- [ ] **T010** ◆ Dump command: `-since`, `-platform`, `-station`, `-failed`, `-json`; failures first,
-      sessions ordered by receipt. `(L)` ▲
+- [ ] **T010** ◆ Dump command: `-since` **and a time range `-from`/`-to`** (SC-015 needs the upper
+      bound, `-since` alone cannot express a 15-minute window), `-platform`, `-station`, `-failed`,
+      **`-count`** (sessions reaching `эфир` vs failing, grouped by station and platform, for SC-004),
+      `-json`; failures first, sessions ordered by `(received_at, seq)`. `(L)` ▲
 - [ ] **T011** Go tests: validation, derivation, append, dedupe, prune, handler accept/reject/oversize.
       Keep the coverage ratchet above 22.2%. `(L)`
 - [ ] **T012** Manual check for milestone M1: post a valid and an invalid record with `curl`, confirm
@@ -48,7 +50,9 @@ wrong, P2 hides it.
 - [ ] **T015** ◆ Hook the existing seams — first playback action creates `start`; `setPhase` emits
       `phase`; `dial`/`fail`/`block` emit `attempt`. No second state model. `(M)`
 - [ ] **T016** ◆ Flush policy: debounce 1.5 s, flush at 4 buffered records, on `pagehide` and on
-      `visibilitychange → hidden`; enforce 12 records and 8 KB per session. `(L)` ▲
+      `visibilitychange → hidden`; **coalesce identical consecutive failures within 5 s into one
+      record** (EC-07 — without this rule the budget is spent on a flapping stream); enforce
+      12 records and 8 KB per session. `(L)` ▲
 - [ ] **T017** Transport: `sendBeacon` first, one `fetch(keepalive)` fallback, then silence — no
       retries, no console output. `(S)`
 - [ ] **T018** Emit a single `budget-exhausted` marker instead of the records that no longer fit. `(S)`
@@ -133,7 +137,7 @@ analytics or alerting — those are out of scope in `specify.md`, not missing ta
 | EC-13 invented session id | T008 |
 | EC-14 bad user agent | T004 |
 | EC-15 Firefox GPC by default | T014 |
-| EC-16 record without build | T005 |
+| EC-16 stale client after deploy | T005 |
 
 ### Support tasks without a direct requirement
 

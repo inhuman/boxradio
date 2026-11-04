@@ -101,7 +101,8 @@ As the maintainer, the collector is one more small part of the same service: it 
 disabled, or be blocked by an ad-blocker without touching the player, and I can inspect the raw
 records with a single command on the server.
 *Acceptance:* with the collector switched off, the player works identically; one command returns
-the records of the last 24 hours ordered by session.
+the records of the last 24 hours ordered by session, and that same command (with a flag) counts
+sessions per station and platform — counting is a mode, not a second tool.
 
 ## Data inventory
 
@@ -150,7 +151,7 @@ joined to an identity, and never shared.
 | SC-006 | Playback is unaffected: with the collector blocked, returning errors, or answering 5 s late, all seven player matrix scenarios behave exactly as they do today, with no console noise and no retry storm. |
 | SC-007 | Nothing is sent before the listener's first action: page load issues no additional request. |
 | SC-008 | Bounded loss: if the page is closed or backgrounded abruptly, the record up to the last second is still delivered. |
-| SC-009 | Ordering and deduplication: records arrive in a defined order, and a repeated delivery is stored once. |
+| SC-009 | Ordering and deduplication: records are ordered by `(received_at, seq)` and a repeated delivery is stored once. |
 | SC-010 | Retention: records older than 30 days are unreadable and physically removed, verified by a test that ages a record. |
 | SC-011 | Privacy: the payload contains no field outside the allow-list; a test fails if a new field appears without updating this document. |
 | SC-012 | Opt-out: with the browser's Global Privacy Control (or Do Not Track) signal set, the player sends nothing and plays identically. |
@@ -178,7 +179,7 @@ joined to an identity, and never shared.
 | EC-13 | Session id is invented or replayed by a third party | Worst case is a bogus record; no other record is affected, nothing is deleted or overwritten. |
 | EC-14 | User agent is missing, enormous, or spoofed | Truncated and classified as "unknown"; still a valid record. |
 | EC-15 | Browser sends the privacy signal by default (Firefox ships GPC on) | Nothing is sent, by design. This is expected and must not be diagnosed as a telemetry bug — the absence of Firefox sessions is the opt-out working. |
-| EC-16 | Record arrives without a build identifier (a cached older player) | Stored as `unknown`; still a valid record, just not attributable to a build. |
+| EC-16 | A cached older player reports after a deploy | The record is stamped with the build being served at ingest, so attribution can be one deploy off. Nothing is rejected; `received_at` against the deploy time bounds the error, and it is the reason a record's build must be read together with its timestamp. |
 
 ## Constraints from the constitution
 
