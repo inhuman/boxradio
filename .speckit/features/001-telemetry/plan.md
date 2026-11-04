@@ -44,7 +44,7 @@ No new dependency, no build step, no container, no queue, no database.
   `visibilitychange → hidden`. Budget: 12 records, 8 KB per session (SC-005); beyond that, records
   are dropped locally and a single `budget-exhausted` marker is kept.
 - Transport: beacon with `application/json`; if unavailable or it returns `false`, one
-  `fetch(..., {keepalive:true})` attempt; then silence. No retries, no console output (EC-4, EC-5).
+  `fetch(..., {keepalive:true})` attempt; then silence. No retries, no console output (EC-04, EC-05).
 
 ### Collector (`main.go`, new subcommands: `serve` default, `telemetry`, `telemetry-dump`)
 
@@ -54,7 +54,7 @@ No new dependency, no build step, no container, no queue, no database.
 - **User agent is read from the request header and never stored.** Platform family and browser
   family/version are derived server-side and truncated; the raw string goes nowhere, not even logs.
 - `received_at` (server clock) is stamped on every record; the client clock is only used for
-  offsets within a session (EC-6).
+  offsets within a session (EC-06).
 - **Build stamp:** `sha256(app.js)` truncated to 12 hex, cached by `mtime`, refreshed per request.
   Every record carries it (SC-016).
 - Append with `O_APPEND`, one `write` per record, file per UTC day. Dedupe on `(sid, seq)` with a
@@ -115,7 +115,7 @@ reading the player code. Covers SC-002, SC-013, SC-015. **Milestone M3.**
 Rate limit, flood test, slow/erroring collector matrix re-run, dedupe under duplicate delivery,
 systemd unit + nginx location + sudoers + CI restart, deploy verification (served `app.js` hash).
 *Done when:* all 16 spec criteria pass, including SC-006 and SC-014, and a deploy is verified by hash.
-Covers SC-006, SC-009, SC-014, EC-4, EC-5, EC-7. **Milestone M4.**
+Covers SC-006, SC-009, SC-014, EC-04, EC-05, EC-07. **Milestone M4.**
 
 ## Constitution check
 
@@ -152,7 +152,7 @@ differs.
 | GPC on by default in Firefox ⇒ no Firefox sessions | Expected by D-3, recorded as EC-15 so nobody debugs it. |
 | Raw user agent leaking into logs or files | Derivation lives in one function with a test asserting the raw UA appears in neither the file nor the log output. |
 | Rate limiter as a memory growth vector | Bounded map with 10-minute expiry; a flood costs memory, not disk. |
-| Ad-blockers filtering `/api/telemetry` | Silent client (EC-5); if measurements later show heavy blocking, the route can be renamed — a deploy, not a redesign. |
+| Ad-blockers filtering `/api/telemetry` | Silent client (EC-05); if measurements later show heavy blocking, the route can be renamed — a deploy, not a redesign. |
 
 ## Testing
 

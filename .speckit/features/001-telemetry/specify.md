@@ -163,15 +163,15 @@ joined to an identity, and never shared.
 
 | ID | Case | Required behaviour |
 |---|---|---|
-| EC-1 | Listener opens the page and never presses play | No record, no request. |
-| EC-2 | App is backgrounded and the OS suspends audio | The suspension is recorded as a phase transition, and the session does not look like a fresh one on return. |
-| EC-3 | Page is closed from the app switcher | Pending records are delivered without delaying the close; loss bounded to the last second. |
-| EC-4 | Collector is down, slow, or answers 500 | Records are dropped after a short bounded wait; the player is unaffected; no retry storm; no console output. |
-| EC-5 | Ad-blocker or DNS filter blocks the collector | Silent drop; the player behaves normally. |
-| EC-6 | Device clock is wrong or changes mid-session | Ordering uses a client sequence plus server receipt time; durations are computed from monotonic offsets, never from wall-clock differences. |
-| EC-7 | Network flaps, the player retries every few seconds for minutes | Identical consecutive failures within 5 s are coalesced; the 12-record budget still holds. |
-| EC-8 | Session runs for hours with the screen off | Transitions only, plus a periodic summary, within the record budget. |
-| EC-9 | Two tabs open at once | Two independent sessions; no cross-contamination; each respects the budget. |
+| EC-01 | Listener opens the page and never presses play | No record, no request. |
+| EC-02 | App is backgrounded and the OS suspends audio | The suspension is recorded as a phase transition, and the session does not look like a fresh one on return. |
+| EC-03 | Page is closed from the app switcher | Pending records are delivered without delaying the close; loss bounded to the last second. |
+| EC-04 | Collector is down, slow, or answers 500 | Records are dropped after a short bounded wait; the player is unaffected; no retry storm; no console output. |
+| EC-05 | Ad-blocker or DNS filter blocks the collector | Silent drop; the player behaves normally. |
+| EC-06 | Device clock is wrong or changes mid-session | Ordering uses a client sequence plus server receipt time; durations are computed from monotonic offsets, never from wall-clock differences. |
+| EC-07 | Network flaps, the player retries every few seconds for minutes | Identical consecutive failures within 5 s are coalesced; the 12-record budget still holds. |
+| EC-08 | Session runs for hours with the screen off | Transitions only, plus a periodic summary, within the record budget. |
+| EC-09 | Two tabs open at once | Two independent sessions; no cross-contamination; each respects the budget. |
 | EC-10 | Browser storage is disabled or private mode hides it | Session identity lives only in memory; playback and telemetry both keep working. |
 | EC-11 | Malformed, oversized, or unknown-field payload | Rejected as a whole; nothing partially stored; no crash. |
 | EC-12 | Station URL is mixed content (http on an https page) | Recorded as that specific failure reason. |
