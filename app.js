@@ -257,113 +257,165 @@ function showStation() {
 // intent separate keeps the button on "pause" while recovery restarts the
 // stream (selecting a new source momentarily puts the element back to paused).
 let wantsPlay = false;
-let status = 'idle'; // 'idle' | 'live' | 'retry'
 
-function setStatus(next) {
-  if (status === next) return;
-  status = next;
-  statusDot.classList.toggle('live', next === 'live');
+// phase drives the header, and so it also decides what the user is told is
+// happening. The old code called every dial a "reconnect", so a slow first
+// connection and a station that will never answer looked exactly the same:
+// "переподключение" for as long as you cared to stare at it.
+let phase = 'idle'; // 'idle' | 'connecting' | 'live' | 'retry' | 'failed' | 'blocked'
+
+const PHASE_TEXT = {
+  idle:       '',
+  connecting: 'подключение',
+  live:       'эфир',
+  retry:      'переподключение',
+  failed:     'нет сигнала',
+  blocked:    'нажмите ▶',
+};
+
+function setPhase(next) {
+  if (phase === next) return;
+  phase = next;
+  const isError = next === 'failed' || next === 'blocked';
+  statusDot.classList.toggle('live',  next === 'live');
   statusDot.classList.toggle('retry', next === 'retry');
+  statusDot.classList.toggle('error', isError);
   statusEl.classList.toggle('retry', next === 'retry');
-  statusEl.textContent =
-    next === 'live'  ? 'эфир' :
-    next === 'retry' ? 'переподключение' : '';
+  statusEl.classList.toggle('error', isError);
+  statusEl.textContent = PHASE_TEXT[next];
 }
 
 function setIntent(on) {
   wantsPlay = on;
   btnPlay.innerHTML = on ? '&#9646;&#9646;' : '&#9654;';
-  if (!on) setStatus('idle');
 }
 
 // ── stream recovery ───────────────────────────────────────────────────────────
-// Live streams die quietly. When a station or the network drops the connection,
-// the browser often fires no `error` at all: currentTime simply stops advancing
-// and the element waits forever. play() does not revive it — the resource has
-// to be selected again, which is exactly what "switch to another station and
-// back" did by hand. The code below does that on its own.
-const CONNECT_MS = 20000; // no audio at all after (re)connecting
-const STALL_MS   = 5000;  // playback was running, then went silent
-const HEALTHY_MS = 15000; // playback long enough to reset the backoff
-const RETRY_MS   = [0, 1000, 2000, 4000, 8000, 15000]; // then 15s forever
+// Live streams die quietly, and mobile Safari goes further: it can leave the
+// element paused with data buffered and simply ignore play(), without raising
+// `error` at all. Silence is therefore the only failure signal we get, and both
+// the dials and the watchdog below are built around it: no sound for N ms means
+// the dial failed, no matter what the element claims.
+const CONNECT_MS    = 10000; // nothing playing this long after a dial
+const STALL_MS      = 6000;  // was playing, then went silent
+const BUFFERED_MS   = 2500;  // data buffered but the element never started
+const HEALTHY_MS    = 15000; // played this long — the stream is fine again
+const MAX_TRIES     = 3;     // failed dials in a row before we stop and ask
+const RETRY_MS      = [0, 1000, 3000, 7000];
 
 let retryTimer = null;
 let healthyTimer = null;
-let lastFailureAt = 0;  // last time the stream failed / recovery was scheduled
-let retries = 0;
+let dialGen = 0;        // bumped on every dial; stale play() results are ignored
+let failedGen = 0;      // last dial already counted as failed (one count per dial)
+let tries = 0;          // failed dials since this station last played
+let lastFailureAt = 0;  // when recovery was last scheduled
 let lastTime = 0;       // last known currentTime
 let lastProgressAt = 0; // when playback last actually moved
 
-function playAudio() {
-  if (!wantsPlay) return;
+function playAudio(gen) {
+  if (!wantsPlay || gen !== dialGen) return;
   const p = audio.play();
-  if (!p) return;
-  // play() resolves even if the user pressed pause mid-connect; don't let a
-  // pending promise undo that.
-  p.then(() => { if (!wantsPlay) audio.pause(); }).catch(onPlayRejected);
+  if (!p || typeof p.then !== 'function') return;
+  p.then(() => {
+    if (!wantsPlay || gen !== dialGen) return;
+    // play() resolving does not prove the element is running. On iOS Safari it
+    // resolves while the element stays paused — a source change outside a
+    // gesture drops the element's playback permission — so nudge it once from
+    // the live element and let the watchdog catch whatever is left.
+    if (audio.paused) {
+      setTimeout(() => {
+        if (wantsPlay && gen === dialGen && audio.paused) audio.play().catch(() => {});
+      }, 350);
+    }
+  }).catch(err => {
+    if (!wantsPlay || gen !== dialGen) return;
+    const name = err && err.name;
+    if (name === 'AbortError') return;      // a newer dial superseded this one
+    if (name === 'NotAllowedError') { block(); return; }
+    fail();
+  });
 }
 
-function onPlayRejected(err) {
-  if (!wantsPlay) return;
-  if (err && err.name === 'NotAllowedError') {
-    // The browser refused to start audio without a user gesture; retrying
-    // would only spin the watchdog, so drop back to paused.
-    stopPlayback();
-    return;
-  }
-  scheduleReconnect();
-}
-
-// reloadStation selects the current station's stream from scratch. Clearing the
-// source and calling load() resets a stalled / errored element; assigning the
-// URL opens a new connection. Assigning src does not fire `pause`, so recovery
-// never looks like the user pressed pause.
-function reloadStation() {
-  if (!wantsPlay) return;
-  clearTimeout(retryTimer);
-  retryTimer = null;
-
-  audio.removeAttribute('src');
-  audio.load();
-  audio.src = STATIONS[current].url;
-  audio.load();
-
-  lastTime = 0;
-  lastProgressAt = Date.now();
-  setStatus('retry');
-  playAudio();
-}
-
-function scheduleReconnect() {
-  if (!wantsPlay || retryTimer) return;
-  const delay = RETRY_MS[Math.min(retries, RETRY_MS.length - 1)];
-  retries++;
-  lastFailureAt = Date.now();
-  setStatus('retry');
-  retryTimer = setTimeout(reloadStation, delay);
-}
-
-function startPlayback() {
-  setIntent(true);
-  retries = 0;
-  lastFailureAt = 0;
-  // Always dial a fresh connection: a paused live stream holds stale buffered
-  // audio and would resume seconds behind the live edge.
-  reloadStation();
-}
-
-function stopPlayback() {
+// closeStream releases the connection instead of leaving it downloading.
+function closeStream() {
   clearTimeout(retryTimer);
   retryTimer = null;
   clearTimeout(healthyTimer);
   healthyTimer = null;
-  retries = 0;
-  setIntent(false);
+  dialGen++;
   audio.pause();
-  // Close the stream connection rather than leaving it downloading while
-  // paused; playback always dials a fresh connection anyway.
   audio.removeAttribute('src');
   audio.load();
+}
+
+// dial selects the current station from scratch. Assigning src is what runs the
+// media load algorithm, so that is all a dial does. The old code also cleared
+// src and called load() before selecting the new one; on iOS Safari that leaves
+// the element paused and unplayable, which is why the radio sat on
+// "переподключение" forever. The fragment makes every dial a fresh URL so the
+// element really reconnects — fragments are never sent to the server.
+function dial() {
+  if (!wantsPlay) return;
+  clearTimeout(retryTimer);
+  retryTimer = null;
+
+  const gen = ++dialGen;
+  lastTime = 0;
+  lastProgressAt = Date.now();
+  setPhase(tries > 0 ? 'retry' : 'connecting');
+  audio.src = STATIONS[current].url + '#' + gen;
+  playAudio(gen);
+}
+
+// fail counts a dead dial and either schedules the next one or gives up.
+function fail() {
+  if (!wantsPlay) return;
+  // Browsers can report one dead source more than once (a 404 arrives as both
+  // `error` and a stalled element). Count each dial once, or the retry budget
+  // burns out before the second attempt.
+  if (failedGen === dialGen) return;
+  failedGen = dialGen;
+  tries++;
+  lastFailureAt = Date.now();
+
+  if (tries >= MAX_TRIES) {
+    // Retrying forever behind "переподключение" is what made a dead station
+    // look like it was about to start. Stop, say so, arm the play button.
+    closeStream();
+    setIntent(false);
+    setPhase('failed');
+    return;
+  }
+
+  setPhase('retry');
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    dial();
+  }, RETRY_MS[Math.min(tries, RETRY_MS.length - 1)]);
+}
+
+// block: the browser wants a tap before it will make sound. Say so and leave
+// the play button armed instead of promising a reconnect that cannot happen.
+function block() {
+  closeStream();
+  setIntent(false);
+  setPhase('blocked');
+}
+
+function startPlayback() {
+  setIntent(true);
+  tries = 0;
+  lastFailureAt = 0;
+  // Always dial a fresh connection: a paused live stream holds stale buffered
+  // audio and would resume seconds behind the live edge.
+  dial();
+}
+
+function stopPlayback() {
+  setIntent(false);
+  setPhase('idle');
+  closeStream();
 }
 
 // ── controls ──────────────────────────────────────────────────────────────────
@@ -371,11 +423,8 @@ function switchTo(idx, autoplay = false) {
   current = (idx + STATIONS.length) % STATIONS.length;
   try { localStorage.setItem(STORE_KEY, String(current)); } catch { /* ignore */ }
 
-  clearTimeout(retryTimer);
-  retryTimer = null;
-  clearTimeout(healthyTimer);
-  healthyTimer = null;
-  retries = 0;
+  tries = 0;
+  lastFailureAt = 0;
 
   showStation();
   highlightActive();
@@ -386,9 +435,8 @@ function switchTo(idx, autoplay = false) {
   } else {
     // Nothing to play: drop the old source instead of leaving the paused
     // element holding a connection to the previous station.
-    audio.removeAttribute('src');
-    audio.load();
-    setStatus('idle');
+    closeStream();
+    setPhase('idle');
   }
 }
 
@@ -402,13 +450,13 @@ btnNext.addEventListener('click', () => switchTo(current + 1, wantsPlay));
 
 // ── stream events ─────────────────────────────────────────────────────────────
 audio.addEventListener('playing', () => {
-  setStatus('live');
+  setPhase('live');
   lastTime = audio.currentTime;
   lastProgressAt = Date.now();
   clearTimeout(healthyTimer);
-  // Only a stream that stays up resets the backoff, so a station that dies
-  // right after connecting backs off instead of reconnecting in a tight loop.
-  healthyTimer = setTimeout(() => { retries = 0; }, HEALTHY_MS);
+  // Only a stream that stays up resets the counter, so a station that dies
+  // right after connecting still backs off instead of reconnecting in a loop.
+  healthyTimer = setTimeout(() => { tries = 0; }, HEALTHY_MS);
 });
 
 // A stall starts the silence clock; the stream may still recover on its own.
@@ -418,56 +466,72 @@ audio.addEventListener('waiting', () => {
 
 audio.addEventListener('pause', () => {
   if (!wantsPlay) return;  // stopPlayback() already handled it
-  if (audio.ended) return; // a live stream ran dry; `ended` reconnects
+  if (audio.ended) return; // a live stream ran dry; `ended` recovers
 
-  // A failed stream pauses the element too. Chrome sets error and fires
-  // `error` first, but recovery may already have reset the element, so also
-  // ignore pauses that arrive right after a failure was reported.
+  // A failed dial pauses the element too, and recovery may already have
+  // swapped the source. Only a pause that arrives while the element actually
+  // had audio means the user (or the OS) stopped us on purpose.
   if (audio.error || retryTimer) return;
+  if (!audio.getAttribute('src')) return;  // our own teardown
+  if (audio.readyState < 2) return;        // still connecting, not a pause
   if (Date.now() - lastFailureAt < 2000) return;
 
   stopPlayback();
 });
 
 audio.addEventListener('ended', () => {
-  if (wantsPlay) scheduleReconnect();
+  if (wantsPlay) fail();
 });
 
 audio.addEventListener('error', () => {
-  if (wantsPlay) scheduleReconnect();
+  if (wantsPlay) fail();
 });
 
-// Watchdog: a dead stream can sit forever in a half-dead state where
-// currentTime never moves and no error is raised. Silence is the only reliable
-// failure signal for live audio, so treat it as a dropped connection.
+// Watchdog: silence is the only failure signal a live stream gives us.
 setInterval(() => {
   if (!wantsPlay || retryTimer) return;
-  if (audio.paused || audio.ended || audio.seeking) return;
+  if (audio.ended || audio.seeking) return;
 
+  const now = Date.now();
   const t = audio.currentTime;
-  if (Number.isFinite(t) && t !== lastTime) {
+  if (!audio.paused && Number.isFinite(t) && t !== lastTime) {
     lastTime = t;
-    lastProgressAt = Date.now();
+    lastProgressAt = now;
+    return;
+  }
+
+  const waited = now - lastProgressAt;
+
+  // Data is buffered but the element never started: play() was ignored. On
+  // iOS that means the browser wants a gesture — no amount of reconnecting
+  // fixes it, and waiting out the connect timeout made it look like a stuck
+  // "переподключение" with a full buffer and no sound.
+  if (audio.paused && audio.readyState >= 3 && waited > BUFFERED_MS) {
+    block();
     return;
   }
 
   const deadline = lastTime > 0 ? STALL_MS : CONNECT_MS;
-  if (Date.now() - lastProgressAt > deadline) scheduleReconnect();
+  if (waited > deadline) fail();
 }, 1000);
 
 // Coming back online: retry right away instead of waiting out the backoff,
 // but leave healthy playback alone.
 window.addEventListener('online', () => {
-  if (!wantsPlay || Date.now() - lastProgressAt < 3000) return;
-  retries = 0;
-  reloadStation();
+  if (!wantsPlay || phase === 'live') return;
+  if (Date.now() - lastProgressAt < 3000) return;
+  tries = 0;
+  dial();
 });
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible' || !wantsPlay) return;
   // Phone browsers suspend <audio> when the screen locks. Dial in fresh
   // instead of resuming a buffer that is already behind the live edge.
-  if (audio.paused && !audio.ended) reloadStation();
+  if (audio.paused && !audio.ended) {
+    tries = 0;
+    dial();
+  }
 });
 
 // ── volume ────────────────────────────────────────────────────────────────────
