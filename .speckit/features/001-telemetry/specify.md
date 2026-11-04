@@ -36,14 +36,38 @@ Nothing else. No clicks, no scroll positions, no page views, no feature usage.
 | Maintainer | Turns a vague report into a diagnosis: which station, which platform, which phase failed, did sound ever start. |
 | The player | Records its own transitions while it plays, without being able to break playback. |
 
+## Definitions
+
+- **Session** — one page load that produced at least one playback action (a tap on play or on a
+  station). A page that is only opened is not a session.
+- **Record** — one delivered message describing part of a session. A session is a small ordered
+  series of records, not one growing document.
+- **Attempt** — one try at connecting the current station. Retries are attempts.
+- **Phase** — one of the player's own states: `подключение`, `эфир`, `переподключение`,
+  `нет сигнала`, `нажмите ▶`, idle. The vocabulary is the player's, not a parallel one.
+- **Terminal outcome** — the phase a session ended in, or `эфир` if it was still playing when the
+  page went away.
+
+## Assumptions
+
+- One maintainer, one deployment, low volume: fewer than 100 sessions and 30 KB of records a day.
+  Full capture is affordable, so no sampling is needed and none is specified.
+- The collector lives with the same service as the player and is reachable only from the server
+  side; nothing collected is publicly readable.
+- Sessions are few enough per hour that a human can find one by time and platform, which is what
+  makes US-1's lookup rule in SC-015 sufficient.
+- Listeners are not asked for consent because no identity is created; the allow-list is what keeps
+  that true.
+
 ## User stories
 
 **US-1 — Diagnose a reported failure.**
 As the maintainer, when a listener says "the radio doesn't work on my phone", I can pull the recent
 sessions from that platform and see the phase sequence, the terminal phase and the failure reason,
 without asking the listener anything beyond roughly when it happened.
-*Acceptance:* given a session reference taken from the listener's screen-free report (roughly the
-time plus platform), the session is identifiable and shows a complete ordered phase history.
+*Acceptance:* given a time window and a platform family, the session is found by the rule in SC-015
+and shows a complete ordered phase history — no session reference needs to be read off the
+listener's screen.
 
 **US-2 — Separate a dead station from a broken client.**
 As the maintainer, I can group failures by station and by platform, so that "every station fails on
@@ -61,29 +85,38 @@ outcome and the time it spent buffered, not merely "failed".
 As a listener, playback is exactly as before: the first sound arrives no later, the page closes
 without waiting, no visible element appears, and a blocked or broken collector changes nothing I
 can perceive.
+*Acceptance:* with the collector blocked, erroring, or answering 5 s late, the player matrix passes
+unchanged, the time from tap to first sound does not increase, and no element is added to the page.
 
 **US-5 — Privacy by construction.**
 As a listener, I am not identified: nothing survives the page that could recognise me, no third
 party sees this, and the record is discarded after 30 days. I can opt out with the browser's
 privacy signal and the player still works.
+*Acceptance:* inspecting the payload shows only allow-listed fields; a reload produces a different
+session reference and no stored identifier remains; a record aged past 30 days cannot be read; with
+the privacy signal set, nothing is sent and playback is unaffected.
 
 **US-6 — Operate it without ceremony.**
 As the maintainer, the collector is one more small part of the same service: it can fail, be
 disabled, or be blocked by an ad-blocker without touching the player, and I can inspect the raw
 records with a single command on the server.
+*Acceptance:* with the collector switched off, the player works identically; one command returns
+the records of the last 24 hours ordered by session.
 
 ## Data inventory
 
 Captured (allow-list, nothing outside it):
 
 - a session reference, random per page load, not stored in the browser, not stable across visits;
-- platform family and browser family/version, derived from the user agent and truncated;
+- platform family — one of `ios`, `android`, `desktop`, `unknown` — and browser family — one of
+  `safari`, `chrome`, `firefox`, `other`, `unknown` — with a version, derived from the user agent
+  and truncated;
 - the station tuned (as configured in the player), and the transition to each station;
 - the ordered playback phases with the time spent in each: `подключение`, `эфир`,
   `переподключение`, `нет сигнала`, `нажмите ▶`, idle;
 - per attempt: how long it took, whether it was a retry, how many retries had already failed;
-- the failure reason the platform exposes, if any: refused playback, media error, transport error,
-  stall duration, mixed-content block;
+- the failure reason the platform exposes, if any, from a closed set: `play-refused`,
+  `media-error`, `transport-error`, `stall`, `mixed-content`, `none`;
 - whether sound was ever produced, and the time from tap to first sound;
 - foreground/background transitions and connection class changes (coarse, as the browser reports
   them), because a phone losing the screen is a normal cause of a stall;
@@ -119,7 +152,8 @@ joined to an identity, and never shared.
 | SC-011 | Privacy: the payload contains no field outside the allow-list; a test fails if a new field appears without updating this document. |
 | SC-012 | Opt-out: with the browser's Global Privacy Control (or Do Not Track) signal set, the player sends nothing and plays identically. |
 | SC-013 | Time to diagnosis: from "it doesn't work on my phone" to a full phase history in under 5 minutes of maintainer work. |
-| SC-014 | Abusive volume: a client that floods the collector cannot exhaust server resources; legitimate records are not lost as a result. |
+| SC-014 | Flood resistance: at most the session budget is accepted per session reference; a source sending 100× normal volume is rejected or rate-limited without dropping other sessions' records and without increasing the delay the player sees. |
+| SC-015 | Lookup rule: a session is identifiable from a ±15 minute time window plus platform family; when several sessions match, failures are listed before sessions that played; when one matches, the result is unambiguous. |
 
 ## Edge cases
 
@@ -143,8 +177,8 @@ joined to an identity, and never shared.
 ## Constraints from the constitution
 
 - **I** — telemetry uses the player's own phase vocabulary; it may not invent a parallel state model.
-- **IV** — no request before the first tap; the page payload budget is unchanged; the collector must
-  not sit in the audio path (**VI**).
+- **IV** — no request before the first tap; the page payload budget is unchanged.
+- **VI** — the collector must not sit in the audio path, and must not proxy or inspect stream content.
 - **V** — verification happens in WebKit with iPhone emulation, muted, and must include the
   collector-blocked variant.
 - **IX** — no new visible UI, no change to the live region.
@@ -161,6 +195,10 @@ joined to an identity, and never shared.
 - Consent banner. Not needed while the allow-list holds and no identity is created; if either
   changes, this feature is re-specified first.
 - Historical backfill: nothing is collected before this ships.
+- Failures that happen before the player runs: a page that never loads its scripts, a DNS or TLS
+  failure on the site itself, a browser with JavaScript disabled. Those sessions cannot report on
+  themselves and are not covered.
+- Synthetic monitoring, uptime checks, and telemetry from any client other than the player.
 
 ## Open questions (for `/speckit-clarify`)
 
