@@ -31,7 +31,7 @@ const (
 
 	maxBodyBytes      = 8 << 10 // request body hard cap
 	maxBatch          = 8       // records per request
-	maxSessionRecords = 12      // records per session (spec SC-005)
+	maxSessionRecords = 24      // records per session (spec SC-005)
 	maxSessionBytes   = 8 << 10 // per-session payload budget
 
 	maxSessionsTracked = 10000

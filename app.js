@@ -152,6 +152,7 @@ const btnNext    = document.getElementById('btn-next');
 const volumeEl   = document.getElementById('volume');
 const listEl     = document.getElementById('list');
 const filterEl   = document.getElementById('filter');
+const BASE_TITLE = document.title;
 
 // ── favorites (persisted by station url) ────────────────────────────────────────
 const FAV_KEY = 'boxradio:favs';
@@ -257,7 +258,7 @@ function showStation() {
 // See .speckit/features/001-telemetry/specify.md for the allow-list.
 const telemetry = (() => {
   const ENDPOINT = '/api/telemetry';
-  const MAX_RECORDS = 12;   // per session (SC-005)
+  const MAX_RECORDS = 24;   // per session; a stall costs two records (SC-005)
   const MAX_BYTES = 8192;   // per session
   const MAX_BATCH = 8;      // per request
   const FLUSH_MS = 1500;
@@ -428,6 +429,9 @@ function setPhase(next, extra) {
   statusEl.classList.toggle('error', isError);
   statusEl.classList.toggle('buffering', isBuffer);
   statusEl.textContent = PHASE_TEXT[next];
+  // A one-second refill is easy to miss in the header; the tab strip is not.
+  const title = isBuffer ? 'буферизация — ' + BASE_TITLE : BASE_TITLE;
+  if (document.title !== title) document.title = title;
 }
 
 function setIntent(on) {
@@ -442,10 +446,10 @@ function setIntent(on) {
 // keep five seconds buffered, and play from behind the live edge. Everywhere
 // else the element path below is used unchanged.
 const buffered = (() => {
-  const RESERVE_MS = 5000;     // held before sound starts
+  const RESERVE_MS = 8000;     // held before sound starts (observed outages are ~5 s)
   const MAX_BUFFER = 20;       // seconds ahead before we jump forward
   const TRIM_BEHIND = 10;      // seconds kept behind the playhead
-  const START_TIMEOUT = 10000;
+  const START_TIMEOUT = 12000; // an 8 s reserve takes ~8 s to arrive
 
   let ms = null, sb = null, ctrl = null, timer = null;
   let started = false, url = null;

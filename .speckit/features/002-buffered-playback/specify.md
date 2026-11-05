@@ -22,7 +22,7 @@ as well. Support is a per-browser fact, not a per-vendor one, so the player asks
 
 ## What
 
-The player holds **5 seconds of audio in reserve** before it starts, and keeps that reserve while
+The player holds **8 seconds of audio in reserve** before it starts, and keeps that reserve while
 playing by fetching ahead and trimming what has been played. The reserve absorbs one- and two-second
 network stalls instead of turning them into silence.
 
@@ -71,8 +71,8 @@ As the maintainer, I can verify the reserve from telemetry and from a measuremen
 
 | ID | Criterion |
 |---|---|
-| SC-001 | On a supporting browser, sound starts only after at least 5 s of audio are buffered (measured reserve at `эфир` ≥ 4.5 s). |
-| SC-002 | Start delay stays within 8 s from tap to first sound on a normal connection; beyond 10 s the attempt is abandoned and reported as `нет сигнала`. |
+| SC-001 | On a supporting browser, sound starts only after at least 8 s of audio are buffered (measured reserve at `эфир` ≥ 7.5 s). |
+| SC-002 | Start delay stays within 12 s from tap to first sound on a normal connection; beyond 12 s the attempt is abandoned and reported as `нет сигнала`. |
 | SC-003 | A simulated 2 s stall produces no audible gap: playback does not stop, and the element does not enter `waiting`. |
 | SC-004 | The header shows `буферизация` while the reserve fills and while it refills after a stall, and `эфир` once sound is flowing. |
 | SC-005 | The path matches the capability check: if MSE reports MP3/AAC support the buffered path runs, otherwise playback is identical to today's — same start timing, same states, same fallback. |
@@ -101,7 +101,7 @@ As the maintainer, I can verify the reserve from telemetry and from a measuremen
 
 - Server-side delay or relay: audio never goes through our server (constitution §VI).
 - HLS, DASH, codec transcoding or remuxing.
-- A user-facing buffer setting; 5 s is fixed.
+- A user-facing buffer setting; 8 s is fixed.
 - iOS/Safari getting the delay — not possible with MSE and MP3, and not needed: iOS showed no cuts.
 - Gapless cross-station transitions.
 
@@ -109,7 +109,7 @@ As the maintainer, I can verify the reserve from telemetry and from a measuremen
 
 | ID | Decision | Why |
 |---|---|---|
-| D-1 | 5 s reserve, fixed | Long enough to absorb the observed 1–2 s, short enough that the tap does not feel broken. |
+| D-1 | 8 s reserve, fixed | Raised from 5 s after production telemetry showed a 4.9 s outage: the old reserve was drained exactly. 8 s covers it at the cost of a longer start. |
 | D-2 | Capability check, not user-agent sniffing | `MediaSource.isTypeSupported` is the honest question. WebKit 26 answers yes and buffered playback works there; older builds answer no and fall back. |
 | D-3 | A new `буферизация` phase | The wait is real and must be visible; hiding it would repeat the bug principle I exists to prevent. |
 | D-4 | Keep the element path as the fallback | It is what works on iOS; it must not be removed to simplify the new path. |

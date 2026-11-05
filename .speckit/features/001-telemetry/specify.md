@@ -147,7 +147,7 @@ joined to an identity, and never shared.
 | SC-002 | A session that ends in `нажмите ▶` with a buffered stream is reported as that specific outcome (not as a generic failure), including the buffered duration. |
 | SC-003 | A station returning an error is distinguishable from a refused `play()` and from a stall, by the failure reason recorded. |
 | SC-004 | Per 24 hours, sessions reaching `эфир` and sessions failing can be counted per station and per platform. |
-| SC-005 | Volume: no more than one record per 30 s of playback, at most 12 per 10-minute session, at most 8 KB per session. |
+| SC-005 | Volume: no more than one record per 30 s of playback, at most 24 per 10-minute session (a stall costs two), at most 8 KB per session. |
 | SC-006 | Playback is unaffected: with the collector blocked, returning errors, or answering 5 s late, all seven player matrix scenarios behave exactly as they do today, with no console noise and no retry storm. |
 | SC-007 | Nothing is sent before the listener's first action: page load issues no additional request. |
 | SC-008 | Bounded loss: if the page is closed or backgrounded abruptly, the record up to the last second is still delivered. |
