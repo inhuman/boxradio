@@ -76,6 +76,7 @@ body {
   transition: color .4s;
 }
 .box__status.retry { color: var(--amber-dim); }
+.box__status.buffering { color: var(--amber-dim); }
 .box__status.error { color: #c04040; }
 
 .box__dot {
@@ -94,6 +95,11 @@ body {
   background: var(--amber);
   box-shadow: 0 0 6px rgba(232,160,64,.45);
   animation: blink 1s ease-in-out infinite;
+}
+.box__dot.buffering {
+  background: var(--amber);
+  box-shadow: 0 0 6px rgba(232,160,64,.35);
+  animation: blink 1.6s ease-in-out infinite;
 }
 .box__dot.error {
   background: #e84040;

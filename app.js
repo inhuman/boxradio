@@ -406,22 +406,27 @@ let phase = 'idle'; // 'idle' | 'connecting' | 'live' | 'retry' | 'failed' | 'bl
 const PHASE_TEXT = {
   idle:       '',
   connecting: 'подключение',
+  buffering:  'буферизация',
   live:       'эфир',
   retry:      'переподключение',
   failed:     'нет сигнала',
   blocked:    'нажмите ▶',
 };
 
-function setPhase(next) {
+function setPhase(next, extra) {
   if (phase === next) return;
   phase = next;
-  if (telemetry) telemetry.phase(next);
+  if (telemetry) telemetry.phase(next, extra);
+  if (next === 'buffering') bufferingSince = Date.now();
   const isError = next === 'failed' || next === 'blocked';
+  const isBuffer = next === 'buffering';
   statusDot.classList.toggle('live',  next === 'live');
   statusDot.classList.toggle('retry', next === 'retry');
   statusDot.classList.toggle('error', isError);
+  statusDot.classList.toggle('buffering', isBuffer);
   statusEl.classList.toggle('retry', next === 'retry');
   statusEl.classList.toggle('error', isError);
+  statusEl.classList.toggle('buffering', isBuffer);
   statusEl.textContent = PHASE_TEXT[next];
 }
 
@@ -429,6 +434,167 @@ function setIntent(on) {
   wantsPlay = on;
   btnPlay.innerHTML = on ? '&#9646;&#9646;' : '&#9654;';
 }
+
+// ── buffered playback ────────────────────────────────────────────────────────
+// A plain <audio> on a live stream keeps only ~2 s of reserve (measured), which
+// is exactly the size of the holes listeners hear. There is no API to ask for
+// more, so on browsers whose MSE accepts MP3/AAC we fetch the stream ourselves,
+// keep five seconds buffered, and play from behind the live edge. Everywhere
+// else the element path below is used unchanged.
+const buffered = (() => {
+  const RESERVE_MS = 5000;     // held before sound starts
+  const MAX_BUFFER = 20;       // seconds ahead before we jump forward
+  const TRIM_BEHIND = 10;      // seconds kept behind the playhead
+  const START_TIMEOUT = 10000;
+
+  let ms = null, sb = null, ctrl = null, timer = null;
+  let started = false, url = null;
+
+  function supported() {
+    try {
+      if (!window.MediaSource || !window.ReadableStream || !MediaSource.isTypeSupported) return false;
+      return MediaSource.isTypeSupported('audio/mpeg') || MediaSource.isTypeSupported('audio/aac');
+    } catch { return false; }
+  }
+
+  function type() {
+    return MediaSource.isTypeSupported('audio/mpeg') ? 'audio/mpeg' : 'audio/aac';
+  }
+
+  function release() {
+    clearTimeout(timer);
+    timer = null;
+    started = false;
+    try { if (ctrl) ctrl.abort(); } catch { /* already gone */ }
+    ctrl = null;
+    sb = null;
+    if (ms) {
+      try { if (ms.readyState === 'open') ms.endOfStream(); } catch { /* detached */ }
+      ms = null;
+    }
+    if (url) {
+      try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+      url = null;
+    }
+  }
+
+  function stop() {
+    release();
+  }
+
+  function append(chunk) {
+    return new Promise((resolve, reject) => {
+      if (!sb || !ms || ms.readyState !== 'open') return resolve();
+      const done = () => { sb.removeEventListener('updateend', done); resolve(); };
+      const bad = () => { sb.removeEventListener('error', bad); reject(new Error('append')); };
+      sb.addEventListener('updateend', done);
+      sb.addEventListener('error', bad, { once: true });
+      try { sb.appendBuffer(chunk); } catch (e) { reject(e); }
+    });
+  }
+
+  function trim() {
+    return new Promise(resolve => {
+      if (!sb || !ms || ms.readyState !== 'open' || sb.updating) return resolve();
+      const b = sb.buffered;
+      if (!b.length || !started) return resolve();
+      const begin = b.start(0);
+      const playhead = audio.currentTime || 0;
+      if (playhead - begin <= TRIM_BEHIND) return resolve();
+      const done = () => { sb.removeEventListener('updateend', done); resolve(); };
+      sb.addEventListener('updateend', done);
+      try { sb.remove(begin, Math.max(begin, playhead - 3)); } catch { resolve(); }
+    });
+  }
+
+  function reserve() {
+    if (!sb || !sb.buffered.length) return 0;
+    const b = sb.buffered;
+    return Math.round((b.end(b.length - 1) - b.start(0)) * 1000);
+  }
+
+  function startIfReady(alive, hooks) {
+    if (started) return;
+    const b = sb && sb.buffered;
+    if (!b || !b.length) return;
+    const begin = b.start(0);
+    if ((b.end(b.length - 1) - begin) * 1000 < RESERVE_MS) return;
+
+    started = true;
+    clearTimeout(timer);
+    timer = null;
+    try { audio.currentTime = begin; } catch { /* not seekable yet */ }
+    if (hooks.onReserve) hooks.onReserve(reserve());
+    if (hooks.play) hooks.play(); else audio.play().catch(() => {});
+  }
+
+  function drift() {
+    if (!sb || !sb.buffered.length) return;
+    const b = sb.buffered;
+    const end = b.end(b.length - 1);
+    if (end - audio.currentTime > MAX_BUFFER) {
+      try { audio.currentTime = end - RESERVE_MS / 1000; } catch { /* ignore */ }
+    }
+  }
+
+  async function pump(streamURL, alive, hooks) {
+    ctrl = new AbortController();
+    const resp = await fetch(streamURL, {
+      signal: ctrl.signal,
+      cache: 'no-store',
+      headers: { 'Icy-MetaData': '0' },
+    });
+    if (!resp.ok || !resp.body) throw new Error('http ' + resp.status);
+
+    const reader = resp.body.getReader();
+    for (;;) {
+      if (!alive()) { try { await reader.cancel(); } catch { /* ignore */ } return; }
+      const { value, done } = await reader.read();
+      if (done) throw new Error('stream ended');
+      await append(value);
+      if (!alive()) return;
+      await trim();
+      if (started) drift(); else startIfReady(alive, hooks);
+    }
+  }
+
+  // start resolves when the pump ends or fails; the caller decides what that
+  // means: a failure before sound is a fallback, after sound it is a drop.
+  async function start(streamURL, alive, hooks) {
+    release();
+    const source = new MediaSource();
+    ms = source;
+    url = URL.createObjectURL(source);
+    audio.src = url;
+
+    await new Promise((resolve, reject) => {
+      source.addEventListener('sourceopen', resolve, { once: true });
+      source.addEventListener('error', () => reject(new Error('sourceopen')), { once: true });
+    });
+    if (!alive()) { release(); return; }
+
+    sb = source.addSourceBuffer(type());
+    if (hooks.onBuffering) hooks.onBuffering();
+
+    timer = setTimeout(() => {
+      if (!started && alive()) {
+        release();
+        if (hooks.onFail) hooks.onFail();
+      }
+    }, START_TIMEOUT);
+
+    try {
+      await pump(streamURL, alive, hooks);
+    } catch (err) {
+      release();
+      if (!alive()) return;
+      if (started) { if (hooks.onDrop) hooks.onDrop(); }
+      else if (hooks.onFail) hooks.onFail();
+    }
+  }
+
+  return { supported, start, stop, reserve };
+})();
 
 // ── stream recovery ───────────────────────────────────────────────────────────
 // Live streams die quietly, and mobile Safari goes further: it can leave the
@@ -449,6 +615,9 @@ let dialGen = 0;        // bumped on every dial; stale play() results are ignore
 let failedGen = 0;      // last dial already counted as failed (one count per dial)
 let dialAt = 0;         // when the current dial started (for telemetry durations)
 let mixedContent = false; // station is http:// on an https page
+let usingBuffered = false; // the current dial owns an MSE buffer
+let lastReserve = 0;      // ms buffered when sound started
+let bufferingSince = 0;   // when the current буферизация phase began
 let tries = 0;          // failed dials since this station last played
 let lastFailureAt = 0;  // when recovery was last scheduled
 let lastTime = 0;       // last known currentTime
@@ -485,6 +654,8 @@ function closeStream() {
   clearTimeout(healthyTimer);
   healthyTimer = null;
   dialGen++;
+  buffered.stop();
+  usingBuffered = false;
   audio.pause();
   audio.removeAttribute('src');
   audio.load();
@@ -510,6 +681,30 @@ function dial() {
   lastTime = 0;
   lastProgressAt = Date.now();
   setPhase(tries > 0 ? 'retry' : 'connecting');
+
+  const url = STATIONS[current].url;
+  usingBuffered = buffered.supported() && !mixedContent;
+  if (usingBuffered) {
+    buffered.start(url, () => gen === dialGen && wantsPlay, {
+      onBuffering: () => { if (gen === dialGen && wantsPlay) setPhase('buffering'); },
+      onReserve: (ms) => { lastReserve = ms; },
+      play: () => playAudio(gen),
+      onFail: () => {
+        // No CORS, no MSE or a stream we cannot read: today's path, once.
+        if (gen !== dialGen || !wantsPlay) return;
+        usingBuffered = false;
+        buffered.stop();
+        elementDial(gen);
+      },
+      onDrop: () => { if (gen === dialGen && wantsPlay) fail('transport-error'); },
+    });
+    return;
+  }
+  elementDial(gen);
+}
+
+// elementDial is the pre-002 path: let the element fetch and buffer the stream.
+function elementDial(gen) {
   audio.src = STATIONS[current].url + '#' + gen;
   playAudio(gen);
 }
@@ -614,7 +809,7 @@ btnNext.addEventListener('click', () => switchTo(current + 1, wantsPlay));
 
 // ── stream events ─────────────────────────────────────────────────────────────
 audio.addEventListener('playing', () => {
-  setPhase('live');
+  setPhase('live', lastReserve > 0 ? { bufferedMs: lastReserve } : undefined);
   lastTime = audio.currentTime;
   lastProgressAt = Date.now();
   clearTimeout(healthyTimer);
@@ -626,6 +821,8 @@ audio.addEventListener('playing', () => {
 // A stall starts the silence clock; the stream may still recover on its own.
 audio.addEventListener('waiting', () => {
   if (wantsPlay) lastProgressAt = Date.now();
+  // A refill is a real state, not silence: say so while it happens.
+  if (wantsPlay && usingBuffered && phase === 'live') setPhase('buffering');
 });
 
 audio.addEventListener('pause', () => {
@@ -654,6 +851,12 @@ audio.addEventListener('error', () => {
 // Watchdog: silence is the only failure signal a live stream gives us.
 setInterval(() => {
   if (!wantsPlay || retryTimer) return;
+  if (phase === 'buffering') {
+    // A refill that never finishes must not hang the header: the constitution
+    // gives this state 15 seconds to become эфир or нет сигнала.
+    if (Date.now() - bufferingSince > 15000) fail('transport-error');
+    return;
+  }
   if (audio.ended || audio.seeking) return;
 
   const now = Date.now();

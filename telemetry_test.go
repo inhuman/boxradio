@@ -87,6 +87,8 @@ func TestValidateRecord(t *testing.T) {
 		{V: 1, Sid: testSid(1), Seq: 2, T: 10, Kind: "phase", From: "idle", To: "connecting", Ms: 10},
 		{V: 1, Sid: testSid(1), Seq: 3, T: 20, Kind: "attempt", Attempt: 1, Reason: "transport-error", Ms: 900},
 		{V: 1, Sid: testSid(1), Seq: 4, T: 30, Kind: "phase", To: "blocked", BufferedMs: 2100},
+		{V: 1, Sid: testSid(1), Seq: 4, T: 25, Kind: "phase", From: "connecting", To: "buffering"},
+		{V: 1, Sid: testSid(1), Seq: 5, T: 30, Kind: "phase", From: "buffering", To: "live", BufferedMs: 5000},
 		{V: 1, Sid: testSid(1), Seq: 5, T: 40, Kind: "budget-exhausted"},
 	}
 	for i, rec := range valid {

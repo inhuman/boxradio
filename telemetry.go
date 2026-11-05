@@ -78,7 +78,8 @@ var (
 		"start": true, "phase": true, "attempt": true, "end": true, "budget-exhausted": true,
 	}
 	validPhases = map[string]bool{
-		"idle": true, "connecting": true, "live": true, "retry": true, "failed": true, "blocked": true,
+		"idle": true, "connecting": true, "buffering": true, "live": true,
+		"retry": true, "failed": true, "blocked": true,
 	}
 	validReasons = map[string]bool{
 		"none": true, "play-refused": true, "media-error": true,
@@ -799,7 +800,7 @@ func groupSessions(records []storedRecord, o dumpOptions) []sessionView {
 }
 
 var phaseLabel = map[string]string{
-	"idle": "", "connecting": "подключение", "live": "эфир",
+	"idle": "", "connecting": "подключение", "buffering": "буферизация", "live": "эфир",
 	"retry": "переподключение", "failed": "нет сигнала", "blocked": "нажмите ▶",
 }
 

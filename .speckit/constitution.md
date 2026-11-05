@@ -2,7 +2,7 @@
 
 Governing principles for spec-driven development in this repository.
 
-**Version:** 1.0.0 · **Ratified:** 2026-11-04 · **Status:** active
+**Version:** 1.1.0 · **Ratified:** 2026-11-04 · **Amended:** 2026-11-05 · **Status:** active
 
 Every `/speckit-specify`, `/speckit-plan`, `/speckit-tasks` and `/speckit-implement` artifact must
 comply. A plan that cannot comply states which amendment it needs — it does not quietly except
@@ -14,8 +14,10 @@ itself.
 
 The header text is a contract with the user, not decoration.
 
-1. Every playback state maps to exactly one label: `подключение`, `эфир`, `переподключение`,
-   `нет сигнала`, `нажмите ▶`, or empty when idle. No other strings, no synonyms.
+1. Every playback state maps to exactly one label: `подключение`, `буферизация`, `эфир`,
+   `переподключение`, `нет сигнала`, `нажмите ▶`, or empty when idle. No other strings, no
+   synonyms. `буферизация` means data is arriving and playback has not started or has paused to
+   refill — it must end in `эфир` or `нет сигнала` within 15 s.
 2. No state may persist without a transition. A stream that answers with an HTTP error reaches
    `нет сигнала` within 8 s; one that never produces sound within 35 s (three 10 s connect
    timeouts plus backoff); buffered-but-silent audio becomes `нажмите ▶` within 5 s.
@@ -110,6 +112,12 @@ forever with a pause icon on screen.
 
 ---
 
+## Amendments
+
+- **1.1.0 (2026-11-05)** — added `буферизация` to the state vocabulary. Rationale: a player that
+  deliberately holds seconds of audio before starting has a real state that is neither "connecting"
+  nor "live", and hiding it would repeat the mistake principle I exists to prevent.
+
 ## Baseline at ratification (2026-11-04)
 
 | Metric | Value |
@@ -118,4 +126,4 @@ forever with a pause icon on screen.
 | Go test coverage | 22.2% |
 | Reference clients | iOS Safari (WebKit), Android Chrome (Chromium) |
 | Deploy path | push to `main` → GitHub Actions → VPS |
-| Player states | `подключение` · `эфир` · `переподключение` · `нет сигнала` · `нажмите ▶` |
+| Player states | `подключение` · `буферизация` · `эфир` · `переподключение` · `нет сигнала` · `нажмите ▶` |
