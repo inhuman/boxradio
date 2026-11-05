@@ -148,7 +148,9 @@ SC-013.
 
 ## Remaining
 
-- [ ] **T029** Deploy to the VPS and confirm a real session from the phone. Requires running
+- [x] **T029** Deploy to the VPS and confirm the collector is reachable (done 2026-11-05:
+      unit active, `/api/telemetry` answers 204, a record landed with the deployed build hash;
+      a session from a real phone is still worth confirming). Previously required running
       `deploy/remote-setup.sh` once (it creates `boxradio-telemetry.service`, the sudoers entry and
       the nginx route). Until then the collector cannot run in production, though the player is
       unaffected: a missing collector means no records, not a broken radio.
