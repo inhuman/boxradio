@@ -54,22 +54,15 @@ map $http_upgrade $connection_upgrade {
 }
 EOF
 
-# vhost: everything to the Go server; streams/ws not buffered
-cat > /etc/nginx/sites-available/boxradio <<EOF
+# vhost: everything to the Go server; streams/ws not buffered.
+# On an existing host this file is Certbot-managed (it holds the 443 block), so
+# it must never be rewritten wholesale — only the telemetry route is inserted.
+VHOST=/etc/nginx/sites-available/boxradio
+if [ ! -f "$VHOST" ]; then
+cat > "$VHOST" <<EOF
 server {
     listen 80;
     server_name $DOMAIN;
-
-    # Exact match: only this one path reaches the collector, and only over
-    # loopback. Everything else stays on the static service.
-    location = /api/telemetry {
-        proxy_pass http://127.0.0.1:8081;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Forwarded-For \$remote_addr;
-        client_max_body_size 16k;
-        proxy_read_timeout 10s;
-    }
 
     location / {
         proxy_pass http://127.0.0.1:8080;
@@ -84,6 +77,37 @@ server {
     }
 }
 EOF
+fi
+
+# Exact match: only this one path reaches the collector, and only over loopback.
+if ! grep -q "location = /api/telemetry" "$VHOST"; then
+    BK="$VHOST.bak.$(date +%s)"
+    cp -a "$VHOST" "$BK"
+    python3 - "$VHOST" <<'INNER_EOF'
+import sys
+path = sys.argv[1]
+src = open(path).read()
+block = """    location = /api/telemetry {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        client_max_body_size 16k;
+        proxy_read_timeout 10s;
+    }
+
+"""
+i = src.find("    location / {")
+if i < 0:
+    sys.exit("no 'location /' block to insert before")
+open(path, "w").write(src[:i] + block + src[i:])
+INNER_EOF
+    if ! nginx -t; then
+        cp -a "$BK" "$VHOST"
+        echo "vhost restored from $BK" >&2
+        exit 1
+    fi
+fi
 
 ln -sf /etc/nginx/sites-available/boxradio /etc/nginx/sites-enabled/boxradio
 rm -f /etc/nginx/sites-enabled/default
@@ -117,7 +141,9 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable --now boxradio-telemetry
+# Not started here: the running binary predates -telemetry, and Restart=always
+# would loop on it. The next deploy restarts the unit with the new binary.
+systemctl enable boxradio-telemetry
 
 # limited sudo for the CI deploy user
 cat > /etc/sudoers.d/boxradio <<EOF
