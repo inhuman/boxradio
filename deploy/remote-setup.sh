@@ -27,6 +27,7 @@ set -a; . ./.env; set +a
 : "${LE_EMAIL:?LE_EMAIL missing in .env}"
 SSH_PORT="${SSH_PORT:-22}"
 DEPLOY_USER="${DEPLOY_USER:-boxradio}"
+DEPLOY_PATH="${DEPLOY_PATH:-/opt/boxradio}"
 
 export SSHPASS="$SSH_PASSWORD"
 
@@ -38,7 +39,7 @@ sshpass -e ssh \
   -o StrictHostKeyChecking=accept-new \
   -o ConnectTimeout=15 \
   "$SSH_USER@$SSH_HOST" \
-  "sudo DOMAIN='$DOMAIN' LE_EMAIL='$LE_EMAIL' DEPLOY_USER='$DEPLOY_USER' bash -s" <<'REMOTE'
+  "sudo DOMAIN='$DOMAIN' LE_EMAIL='$LE_EMAIL' DEPLOY_USER='$DEPLOY_USER' DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'REMOTE'
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
@@ -59,6 +60,17 @@ server {
     listen 80;
     server_name $DOMAIN;
 
+    # Exact match: only this one path reaches the collector, and only over
+    # loopback. Everything else stays on the static service.
+    location = /api/telemetry {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Forwarded-For \$remote_addr;
+        client_max_body_size 16k;
+        proxy_read_timeout 10s;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;
@@ -77,9 +89,39 @@ ln -sf /etc/nginx/sites-available/boxradio /etc/nginx/sites-enabled/boxradio
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 
+# telemetry collector: a separate process, so the static service keeps doing no
+# per-request work (constitution §IV.4)
+install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" -m 0750 "$DEPLOY_PATH/telemetry"
+
+cat > /etc/systemd/system/boxradio-telemetry.service <<EOF
+[Unit]
+Description=boxradio telemetry collector
+After=network.target
+
+[Service]
+Type=simple
+User=$DEPLOY_USER
+Group=$DEPLOY_USER
+WorkingDirectory=$DEPLOY_PATH
+Environment=STATIC_DIR=$DEPLOY_PATH
+Environment=TELEMETRY_DIR=$DEPLOY_PATH/telemetry
+Environment=TELEMETRY_ADDR=127.0.0.1:8081
+ExecStart=$DEPLOY_PATH/boxradio -telemetry
+Restart=always
+RestartSec=2
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now boxradio-telemetry
+
 # limited sudo for the CI deploy user
 cat > /etc/sudoers.d/boxradio <<EOF
-$DEPLOY_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart boxradio, /usr/bin/systemctl reload nginx, /usr/bin/certbot
+$DEPLOY_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart boxradio, /usr/bin/systemctl restart boxradio-telemetry, /usr/bin/systemctl reload nginx, /usr/bin/certbot
 EOF
 chmod 440 /etc/sudoers.d/boxradio
 

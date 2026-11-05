@@ -251,6 +251,145 @@ function showStation() {
   genreEl.textContent   = STATIONS[current].genre;
 }
 
+// ── telemetry ─────────────────────────────────────────────────────────────────
+// The player's own phases, and nothing else, recorded so that a report like
+// "не играет на айфоне" can be reconstructed instead of guessed at.
+// See .speckit/features/001-telemetry/specify.md for the allow-list.
+const telemetry = (() => {
+  const ENDPOINT = '/api/telemetry';
+  const MAX_RECORDS = 12;   // per session (SC-005)
+  const MAX_BYTES = 8192;   // per session
+  const MAX_BATCH = 8;      // per request
+  const FLUSH_MS = 1500;
+  const COALESCE_MS = 5000; // identical failures merge into one record
+
+  // Opt out before anything is allocated. GPC is on by default in Firefox, so
+  // its sessions are simply absent — that is the opt-out working, not a bug.
+  try {
+    const dnt = String(navigator.doNotTrack || window.doNotTrack || '');
+    if (navigator.globalPrivacyControl === true || dnt === '1' || dnt === 'yes') return null;
+  } catch { /* treat as opt-in */ }
+
+  let sid = '';
+  try {
+    const raw = new Uint8Array(8);
+    crypto.getRandomValues(raw);
+    sid = Array.from(raw, b => b.toString(16).padStart(2, '0')).join('');
+  } catch {
+    sid = String(Math.random()).slice(2).padEnd(16, '0').slice(0, 16);
+  }
+
+  const clock = () => (typeof performance !== 'undefined' && performance.now)
+    ? performance.now() : Date.now();
+  const t0 = clock();
+  const at = () => Math.round(clock() - t0);
+
+  let seq = 0;
+  let bytes = 0;
+  let dropped = false;
+  let started = false;
+  let timer = null;
+  let phase = 'idle';
+  let phaseAt = 0;
+  const outbox = [];
+
+  // send delivers one batch. Beacons are reserved for the unload path, where
+  // fetch may be cancelled; WebKit refuses a beacon whose type is not
+  // CORS-safelisted ("application/json" is not), so the body goes as text/plain
+  // and the collector reads JSON regardless of the declared type.
+  function send(records, unload) {
+    let body;
+    try { body = JSON.stringify(records); } catch { return; }
+    if (unload) {
+      try {
+        if (navigator.sendBeacon &&
+            navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'text/plain;charset=UTF-8' }))) {
+          return;
+        }
+      } catch { /* fall through to fetch */ }
+    }
+    try {
+      fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        body: body,
+        keepalive: true,
+      }).catch(() => {});
+    } catch { /* silence: a broken collector must never affect playback */ }
+  }
+
+  function flush(unload) {
+    clearTimeout(timer);
+    timer = null;
+    while (outbox.length) send(outbox.splice(0, MAX_BATCH), unload);
+  }
+
+  function schedule() {
+    if (timer) return;
+    timer = setTimeout(() => { timer = null; flush(); }, FLUSH_MS);
+  }
+
+  function push(fields) {
+    if (dropped) return null;
+    const rec = Object.assign({ v: 1, sid: sid, seq: ++seq, t: at() }, fields);
+    const line = JSON.stringify(rec);
+    if (outbox.length >= MAX_RECORDS - 1 || bytes + line.length > MAX_BYTES) {
+      dropped = true;
+      outbox.push({ v: 1, sid: sid, seq: ++seq, t: at(), kind: 'budget-exhausted' });
+      flush();
+      return null;
+    }
+    bytes += line.length;
+    outbox.push(rec);
+    schedule();
+    return rec;
+  }
+
+  function phaseTo(to, extra) {
+    if (to === phase) return;
+    const now = at();
+    const from = phase;
+    const ms = phaseAt ? now - phaseAt : 0;
+    phase = to;
+    phaseAt = now;
+
+    // A flapping stream repeats the same transition over and over; one record
+    // with the latest timing tells the story better than twelve copies.
+    const prev = outbox[outbox.length - 1];
+    if (prev && prev.kind === 'phase' && prev.from === from && prev.to === to &&
+        now - prev.t < COALESCE_MS) {
+      prev.t = now;
+      prev.ms = ms;
+      return;
+    }
+    push(Object.assign({ kind: 'phase', from: from, to: to, ms: ms }, extra || {}));
+  }
+
+  addEventListener('pagehide', () => flush(true));
+  addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flush(true);
+  });
+
+  return {
+    // Nothing is sent before the listener's first playback action (SC-007).
+    start: function (station) {
+      if (started) return;
+      started = true;
+      push({ t: 0, kind: 'start', station: station });
+    },
+    phase: phaseTo,
+    attempt: function (n, reason, ms) {
+      push({
+        kind: 'attempt',
+        attempt: n,
+        reason: reason || 'none',
+        ms: Math.max(0, Math.round(ms || 0)),
+      });
+    },
+    flush: function () { flush(false); },
+  };
+})();
+
 // ── playback state ────────────────────────────────────────────────────────────
 // wantsPlay is the user's intent, not the state of the <audio> element. A live
 // stream can be dead or reconnecting while the user still wants it on; keeping
@@ -276,6 +415,7 @@ const PHASE_TEXT = {
 function setPhase(next) {
   if (phase === next) return;
   phase = next;
+  if (telemetry) telemetry.phase(next);
   const isError = next === 'failed' || next === 'blocked';
   statusDot.classList.toggle('live',  next === 'live');
   statusDot.classList.toggle('retry', next === 'retry');
@@ -307,6 +447,8 @@ let retryTimer = null;
 let healthyTimer = null;
 let dialGen = 0;        // bumped on every dial; stale play() results are ignored
 let failedGen = 0;      // last dial already counted as failed (one count per dial)
+let dialAt = 0;         // when the current dial started (for telemetry durations)
+let mixedContent = false; // station is http:// on an https page
 let tries = 0;          // failed dials since this station last played
 let lastFailureAt = 0;  // when recovery was last scheduled
 let lastTime = 0;       // last known currentTime
@@ -331,7 +473,7 @@ function playAudio(gen) {
     if (!wantsPlay || gen !== dialGen) return;
     const name = err && err.name;
     if (name === 'AbortError') return;      // a newer dial superseded this one
-    if (name === 'NotAllowedError') { block(); return; }
+    if (name === 'NotAllowedError') { block(bufferedMs()); return; }
     fail();
   });
 }
@@ -360,6 +502,11 @@ function dial() {
   retryTimer = null;
 
   const gen = ++dialGen;
+  dialAt = Date.now();
+  // A station moved to http:// on an https page cannot play at all; the reason
+  // is worth recording so the failure is not mistaken for a dead stream.
+  mixedContent = location.protocol === 'https:' &&
+                 STATIONS[current].url.indexOf('http:') === 0;
   lastTime = 0;
   lastProgressAt = Date.now();
   setPhase(tries > 0 ? 'retry' : 'connecting');
@@ -368,7 +515,7 @@ function dial() {
 }
 
 // fail counts a dead dial and either schedules the next one or gives up.
-function fail() {
+function fail(reason = 'transport-error') {
   if (!wantsPlay) return;
   // Browsers can report one dead source more than once (a 404 arrives as both
   // `error` and a stalled element). Count each dial once, or the retry budget
@@ -377,6 +524,7 @@ function fail() {
   failedGen = dialGen;
   tries++;
   lastFailureAt = Date.now();
+  if (telemetry) telemetry.attempt(tries, reason, Date.now() - dialAt);
 
   if (tries >= MAX_TRIES) {
     // Retrying forever behind "переподключение" is what made a dead station
@@ -397,16 +545,32 @@ function fail() {
 
 // block: the browser wants a tap before it will make sound. Say so and leave
 // the play button armed instead of promising a reconnect that cannot happen.
-function block() {
+function block(buffered = 0) {
+  if (telemetry) {
+    telemetry.phase('blocked', { attempt: tries + 1, reason: 'play-refused', bufferedMs: buffered });
+  }
   closeStream();
   setIntent(false);
   setPhase('blocked');
+}
+
+// bufferedMs is how much audio had arrived before playback was refused: the
+// signature of the iOS state this feature exists to make visible (SC-002).
+function bufferedMs() {
+  return audio.readyState >= 3 ? Date.now() - dialAt : 0;
+}
+
+// errorReason names what the platform reported, from the closed set in the spec.
+function errorReason() {
+  if (mixedContent) return 'mixed-content';
+  return audio.error && audio.error.code === 4 ? 'media-error' : 'transport-error';
 }
 
 function startPlayback() {
   setIntent(true);
   tries = 0;
   lastFailureAt = 0;
+  if (telemetry) telemetry.start(STATIONS[current].name);
   // Always dial a fresh connection: a paused live stream holds stale buffered
   // audio and would resume seconds behind the live edge.
   dial();
@@ -480,11 +644,11 @@ audio.addEventListener('pause', () => {
 });
 
 audio.addEventListener('ended', () => {
-  if (wantsPlay) fail();
+  if (wantsPlay) fail('transport-error');
 });
 
 audio.addEventListener('error', () => {
-  if (wantsPlay) fail();
+  if (wantsPlay) fail(errorReason());
 });
 
 // Watchdog: silence is the only failure signal a live stream gives us.
@@ -507,12 +671,12 @@ setInterval(() => {
   // fixes it, and waiting out the connect timeout made it look like a stuck
   // "переподключение" with a full buffer and no sound.
   if (audio.paused && audio.readyState >= 3 && waited > BUFFERED_MS) {
-    block();
+    block(Date.now() - dialAt);
     return;
   }
 
   const deadline = lastTime > 0 ? STALL_MS : CONNECT_MS;
-  if (waited > deadline) fail();
+  if (waited > deadline) fail(lastTime > 0 ? 'stall' : 'transport-error');
 }, 1000);
 
 // Coming back online: retry right away instead of waiting out the backoff,

@@ -90,7 +90,7 @@ expressible; `-count` groups sessions reaching `эфир` against failing ones p
 | `deploy/remote-setup.sh` | Write and enable `boxradio-telemetry.service`; add `systemctl restart boxradio-telemetry` to the sudoers line; add an exact-match `location = /api/telemetry` to the vhost (`=` outranks the prefix `location /`). Re-run once on the VPS. |
 | `.github/workflows/deploy.yml` | Restart both units. No new artifact: same binary, different argument. |
 | VPS state | `TELEMETRY_DIR=/opt/boxradio/telemetry`, created by the collector with `0700`. |
-| Docs | `sdocs/deploy.md`: how to install the second unit and how to read records without installing anything new. |
+| Docs | `docs/telemetry.md`: reading a session, installing the second unit, and the rollback. |
 
 ## Phases and milestones
 
@@ -126,7 +126,7 @@ Covers SC-006, SC-009, SC-014, EC-04, EC-05, EC-07. **Milestone M4.**
 |---|---|
 | **I** — one state vocabulary | OK: hooks reuse `phase`, no parallel model. |
 | **II** — WebKit/iPhone matrix | OK: every phase verified there; collector-blocked variant added. |
-| **III** — zero-build frontend | OK: code appended to `app.js`, no new asset, no dependency. `app.js` grows ~2.5 KB (28.3 → ~31 KB, budget 45 KB). |
+| **III** — zero-build frontend | OK: code appended to `app.js`, no new asset, no dependency. `app.js` grows ~6 KB as built (28.3 → 34.4 KB, budget 45 KB). |
 | **IV** — payload and load requests | OK for payload and SC-007. **Tension with IV.4** — see below. |
 | **V** — testing | OK: Go table tests, coverage ratchet, browser matrix, **all tests muted**. |
 | **VI** — audio never proxied | OK: the collector sees metadata only, never stream bytes. |

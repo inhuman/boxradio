@@ -70,7 +70,7 @@ blocks the merge; the rest are fixed-or-recorded, and a recorded exception names
 
 ## E. Performance and budgets (`post`)
 
-- [ ] Page payload ≤ 45 KB. Pass: `wc -c index.html style.css app.js` sums to ≤ 46080. ⛔
+- [ ] Page payload ≤ 45 KB. Pass: `wc -c index.html style.css app.js` sums to ≤ 46080 (measured 34416). ⛔
 - [ ] Page load issues no request beyond the four assets. Pass: HAR on a cold load shows only
       `index.html`, `style.css`, `app.js`, `favicon.svg`.
 - [ ] Nothing is sent before the first playback action. Pass: open the page, wait 60 s, do nothing →
@@ -128,8 +128,8 @@ blocks the merge; the rest are fixed-or-recorded, and a recorded exception names
 - [ ] `go test ./...` passes and coverage did not fall below 22.2%. ⛔
 - [ ] New server code has table-driven tests (validation, derivation, append, prune, dump, rate limit).
 - [ ] The payload allow-list test exists and fails on an added field.
-- [ ] `sdocs/telemetry.md` explains lookup by time and platform, and what the output means.
-- [ ] `sdocs/deploy.md` covers the second unit, `TELEMETRY_DIR`, dump usage and retention.
+- [ ] `docs/telemetry.md` explains lookup by time and platform, and what the output means.
+- [ ] `docs/telemetry.md` covers the second unit, `TELEMETRY_DIR`, dump usage and retention.
 - [ ] The commit trail is greppable: `fix(...)`, `docs(spec)`, one feature per branch.
 
 ---

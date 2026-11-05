@@ -15,75 +15,76 @@ place where this feature usually fails.
 Everything here is verifiable with `curl` and `go test`, before the browser is involved. If P1 is
 wrong, P2 hides it.
 
-- [ ] **T001** Add a `Telemetry` config block (`DIR`, `ADDR`, `RETENTION_DAYS`, `MAX_MB`) with env
+- [x] **T001** Add a `Telemetry` config block (`DIR`, `ADDR`, `RETENTION_DAYS`, `MAX_MB`) with env
       defaults and start-up validation; refuse to start on an unwritable dir. `(S)`
-- [ ] **T002** ◆ Restructure `main.go` into three modes — `serve` (default, unchanged behaviour),
+- [x] **T002** ◆ Restructure `main.go` into three modes — `serve` (default, unchanged behaviour),
       `telemetry`, `telemetry-dump` — without touching the serving path. `(M)` ▲
       *Done when:* existing `main_test.go` passes untouched and `GET /` behaves identically.
-- [ ] **T003** ◆ Define the record envelope and a strict decoder: unknown fields rejected, enums
+- [x] **T003** ◆ Define the record envelope and a strict decoder: unknown fields rejected, enums
       checked, `sid` format and `seq` bounds validated. `(M)`
-- [ ] **T004** Derive platform/browser family and truncated version from the request `User-Agent`;
+- [x] **T004** Derive platform/browser family and truncated version from the request `User-Agent`;
       never store or log the raw string. `(S)` ▲
       *Done when:* a table test asserts the raw UA appears in neither the stored line nor the log.
-- [ ] **T005** Compute the build stamp: `sha256(app.js)` truncated to 12 hex, cached by `mtime`. `(S)`
-- [ ] **T006** ◆ Store: append one JSON line per record with `O_APPEND` into a per-UTC-day file,
+- [x] **T005** Compute the build stamp: `sha256(app.js)` truncated to 12 hex, cached by `mtime`. `(S)`
+- [x] **T006** ◆ Store: append one JSON line per record with `O_APPEND` into a per-UTC-day file,
       `0700` directory, created on demand. `(M)`
-- [ ] **T007** ◆ Handler `POST /api/telemetry`: 8 KB body cap, ≤ 8 records, always answer `204`,
+- [x] **T007** ◆ Handler `POST /api/telemetry`: 8 KB body cap, ≤ 8 records, always answer `204`,
       fail-soft on storage errors. `(M)`
-- [ ] **T008** Deduplicate `(sid, seq)` with a bounded in-memory LRU plus a reader-side check. `(M)`
-- [ ] **T009** Prune: run at start and every 24 h; delete day files older than 30 days, then evict
+- [x] **T008** Deduplicate `(sid, seq)` with a bounded in-memory LRU plus a reader-side check. `(M)`
+- [x] **T009** Prune: run at start and every 24 h; delete day files older than 30 days, then evict
       oldest until the directory is under 50 MB. `(M)`
-- [ ] **T010** ◆ Dump command: `-since` **and a time range `-from`/`-to`** (SC-015 needs the upper
+- [x] **T010** ◆ Dump command: `-since` **and a time range `-from`/`-to`** (SC-015 needs the upper
       bound, `-since` alone cannot express a 15-minute window), `-platform`, `-station`, `-failed`,
       **`-count`** (sessions reaching `эфир` vs failing, grouped by station and platform, for SC-004),
       `-json`; failures first, sessions ordered by `(received_at, seq)`. `(L)` ▲
-- [ ] **T011** Go tests: validation, derivation, append, dedupe, prune, handler accept/reject/oversize.
+- [x] **T011** Go tests: validation, derivation, append, dedupe, prune, handler accept/reject/oversize.
       Keep the coverage ratchet above 22.2%. `(L)`
-- [ ] **T012** Manual check for milestone M1: post a valid and an invalid record with `curl`, confirm
+- [x] **T012** Manual check for milestone M1: post a valid and an invalid record with `curl`, confirm
       one line lands and nothing partial is written. `(S)`
 
 ## P2 — Client emitter (`app.js`)
 
-- [ ] **T013** Add the telemetry object: session id in memory only, `seq`, buffer, budget, `enabled`.
+- [x] **T013** Add the telemetry object: session id in memory only, `seq`, buffer, budget, `enabled`.
       No storage, no cookie. `(M)`
-- [ ] **T014** Evaluate the GPC/DNT gate once at load; disabled means no code path ever buffers. `(S)`
-- [ ] **T015** ◆ Hook the existing seams — first playback action creates `start`; `setPhase` emits
+- [x] **T014** Evaluate the GPC/DNT gate once at load; disabled means no code path ever buffers. `(S)`
+- [x] **T015** ◆ Hook the existing seams — first playback action creates `start`; `setPhase` emits
       `phase`; `dial`/`fail`/`block` emit `attempt`. No second state model. `(M)`
-- [ ] **T016** ◆ Flush policy: debounce 1.5 s, flush at 4 buffered records, on `pagehide` and on
+- [x] **T016** ◆ Flush policy: debounce 1.5 s, flush at 4 buffered records, on `pagehide` and on
       `visibilitychange → hidden`; **coalesce identical consecutive failures within 5 s into one
       record** (EC-07 — without this rule the budget is spent on a flapping stream); enforce
       12 records and 8 KB per session. `(L)` ▲
-- [ ] **T017** Transport: `sendBeacon` first, one `fetch(keepalive)` fallback, then silence — no
+- [x] **T017** Transport: `sendBeacon` first, one `fetch(keepalive)` fallback, then silence — no
       retries, no console output. `(S)`
-- [ ] **T018** Emit a single `budget-exhausted` marker instead of the records that no longer fit. `(S)`
-- [ ] **T019** Payload allow-list test in the harness: an unknown field fails the run. `(M)`
-- [ ] **T020** Re-run the player matrix (muted, WebKit/iPhone + Chromium) with the collector in four
+- [x] **T018** Emit a single `budget-exhausted` marker instead of the records that no longer fit. `(S)`
+- [x] **T019** Payload allow-list test in the harness: an unknown field fails the run. `(M)`
+- [x] **T020** Re-run the player matrix (muted, WebKit/iPhone + Chromium) with the collector in four
       modes — normal, 500, blocked, 5 s late — asserting identical behaviour and no console output. `(L)` ▲
 
 ## P3 — Reading and diagnosis
 
-- [ ] **T021** Dump rendering: first-sound offset, buffered duration, terminal outcome and build per
+- [x] **T021** Dump rendering: first-sound offset, buffered duration, terminal outcome and build per
       session, so the output answers "did sound ever start". `(M)`
-- [ ] **T022** ◆ Reproduce the 2026-11 iOS stuck state in the harness, then reconstruct it from the
+- [x] **T022** ◆ Reproduce the 2026-11 iOS stuck state in the harness, then reconstruct it from the
       dump output alone — without reading `app.js`. `(M)` ▲
-- [ ] **T023** Write `sdocs/telemetry.md`: how to find a session by time and platform, and what the
+- [x] **T023** Write `docs/telemetry.md`: how to find a session by time and platform, and what the
       output means. `(S)`
 
 ## P4 — Hardening and deploy
 
-- [ ] **T024** Per-source token bucket: 60 requests/minute, 10-minute expiry, memory only, address
+- [x] **T024** Per-source token bucket: 60 requests/minute, 10-minute expiry, memory only, address
       never written to disk. `(M)`
-- [ ] **T025** Flood test at 100× normal volume: other sessions' records survive, memory stays bounded.
+- [x] **T025** Flood test at 100× normal volume: other sessions' records survive, memory stays bounded.
       `(M)` ▲
-- [ ] **T026** Slow/erroring collector matrix re-run; assert the player still passes all seven
+- [x] **T026** Slow/erroring collector matrix re-run; assert the player still passes all seven
       scenarios and the console stays silent. `(S)`
-- [ ] **T027** ◆ `boxradio-telemetry.service` in `deploy/remote-setup.sh`, sudoers entry for restarting
+- [x] **T027** ◆ `boxradio-telemetry.service` in `deploy/remote-setup.sh`, sudoers entry for restarting
       it, exact-match `location = /api/telemetry` in the vhost. `(M)` ▲
-- [ ] **T028** ◆ CI: build once, restart both units, keep the `app.js` hash verification. `(S)`
+- [x] **T028** ◆ CI: build once, restart both units, keep the `app.js` hash verification. `(S)`
 - [ ] **T029** ◆ Deploy to the VPS, verify the served `app.js` hash, and see a real session from the
       phone in the dump within a minute. `(M)`
-- [ ] **T030** Update `sdocs/deploy.md`: second unit, `TELEMETRY_DIR`, dump usage, retention. `(S)`
-- [ ] **T031** Walk SC-001…SC-016 and record evidence for each, plus a `getconf`-style check that the
+- [x] **T030** Document the second unit, `TELEMETRY_DIR`, dump usage and retention (in
+      `docs/telemetry.md`; `sdocs/` is gitignored). `(S)`
+- [x] **T031** Walk SC-001…SC-016 and record evidence for each, plus a `getconf`-style check that the
       page payload is still under 45 KB. `(M)`
 
 ---
@@ -144,6 +145,13 @@ analytics or alerting — those are out of scope in `specify.md`, not missing ta
 T001 (config), T011 (Go tests), T012 (M1 curl check) and T031 (criterion sweep) are enabling work:
 they gate quality rather than implement one requirement. T023 (diagnosis doc) also serves US-6 and
 SC-013.
+
+## Remaining
+
+- [ ] **T029** Deploy to the VPS and confirm a real session from the phone. Requires running
+      `deploy/remote-setup.sh` once (it creates `boxradio-telemetry.service`, the sudoers entry and
+      the nginx route). Until then the collector cannot run in production, though the player is
+      unaffected: a missing collector means no records, not a broken radio.
 
 ## Risks to watch while executing
 

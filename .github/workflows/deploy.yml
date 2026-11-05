@@ -41,6 +41,9 @@ jobs:
             mv -f incoming/index.html incoming/app.js incoming/style.css incoming/favicon.svg .
             rmdir incoming
             sudo systemctl restart boxradio
+            # The collector is a separate unit, created once by remote-setup.sh.
+            # Restarting it here keeps the build stamp in step with app.js.
+            sudo systemctl restart boxradio-telemetry
             # TLS: issue on first deploy, no-op while valid, reissue when expired.
             # Press "re-run deploy" after a cert expires to regenerate it.
             if [ -n "${{ secrets.DOMAIN }}" ]; then
